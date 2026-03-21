@@ -7,7 +7,7 @@ import (
 
 type Config struct {
 	GRPCPort    int    `env:"GRPC_PORT" envDefault:"50051"`
-	HTTPort     int    `env:HTTP_PORT" envDefault:"8080"`
+	HTTPPort    int    `env:"HTTP_PORT" envDefault:"8080"`
 	DatabaseURL string `env:"DATABASE_URL,required"`
 	RedisURL    string `env:"REDIS_URL,required"`
 }
