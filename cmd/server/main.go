@@ -7,6 +7,8 @@ import (
 	"log/slog"
 
 	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
+	"github.com/dwikynator/core-auth/internal/auth"
+	authrepo "github.com/dwikynator/core-auth/internal/auth/repository"
 	"github.com/dwikynator/core-auth/internal/config"
 	"github.com/dwikynator/core-auth/internal/database"
 	internalredis "github.com/dwikynator/core-auth/internal/redis"
@@ -47,7 +49,11 @@ func run() error {
 	}
 	slog.Info("redis connected")
 
-	// 4. Create the minato server
+	// 4. Initialize auth domain
+	userRepo := authrepo.NewPostgresUserRepo(db)
+	authSvc := auth.NewService(userRepo)
+
+	// 5. Create the minato server
 	grpcAddr := fmt.Sprintf(":%d", cfg.GRPCPort)
 	httpAddr := fmt.Sprintf(":%d", cfg.HTTPPort)
 
@@ -76,7 +82,7 @@ func run() error {
 		}),
 	)
 
-	// 5. Register cross-transport middleware (HTTP + gRPC)
+	// 6. Register cross-transport middleware (HTTP + gRPC)
 	// RecoveryPlugin MUST be first — outermost wrapper catches all panics.
 	server.UsePlugin(
 		middleware.RecoveryPlugin(),
@@ -87,14 +93,14 @@ func run() error {
 	// HTTP-only middleware
 	server.Use(middleware.CORS())
 
-	// 6. Register gRPC services
+	// 7. Register gRPC services
 	// TODO: Wire up actual handlers
 	server.RegisterGRPC(func(s grpc.ServiceRegistrar) {
-		authv1.RegisterAuthServiceServer(s, &authv1.UnimplementedAuthServiceServer{})
+		authv1.RegisterAuthServiceServer(s, authSvc)
 	})
 	server.RegisterGateway(authv1.RegisterAuthServiceHandlerFromEndpoint)
 
-	// 7. Start (blocks until SIGINT/SIGTERM)
+	// 8. Start (blocks until SIGINT/SIGTERM)
 	slog.Info("starting server", "grpc_addr", grpcAddr, "http_addr", httpAddr)
 	return server.Run()
 }
