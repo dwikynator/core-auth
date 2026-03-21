@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
+
+// ---------------------------------------------------------------------------
+// Error Codes
+//
+// core-auth uses the standard google.rpc.Status error model.
+// Every non-OK response includes an `error_code` string in the status details
+// that uniquely identifies the failure reason. Clients should switch on
+// `error_code`, never on the human-readable `message` string.
+//
+// HTTP status codes are mapped by grpc-gateway from the gRPC status code.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Error Code Reference
+//
+// Format per entry:
+//   ERROR_CODE          gRPC Status Code         HTTP     Description
+// ---------------------------------------------------------------------------
+
+// ── Identity & Account ──────────────────────────────────────────────────────
+//
+//   user_not_found            NOT_FOUND              404     No user matches the given identifier.
+//   user_already_exists       ALREADY_EXISTS         409     Email, username or phone is already registered.
+//   account_not_verified      FAILED_PRECONDITION    400     Login attempted before email/phone is verified.
+//   account_suspended         PERMISSION_DENIED      403     Account has been suspended by an administrator.
+//   account_deleted           PERMISSION_DENIED      403     Account has been soft-deleted.
+//   account_locked            PERMISSION_DENIED      403     Account is temporarily locked after repeated failed logins.
+
+// ── Credentials & Tokens ────────────────────────────────────────────────────
+//
+//   invalid_credentials       UNAUTHENTICATED        401     Wrong password or identifier.
+//   invalid_token             UNAUTHENTICATED        401     Token is malformed or does not exist.
+//   token_expired             UNAUTHENTICATED        401     Token has passed its expiry time.
+//   token_already_used        UNAUTHENTICATED        401     Single-use token has already been consumed.
+//   token_reuse_detected      UNAUTHENTICATED        401     Refresh token reuse detected; possible theft. All sessions revoked.
+
+// ── Input Validation ────────────────────────────────────────────────────────
+//
+//   password_policy_violation INVALID_ARGUMENT       400     Password does not meet the minimum policy requirements.
+//   invalid_identifier_format INVALID_ARGUMENT       400     Email, phone, or username format is invalid.
+
+// ── MFA ─────────────────────────────────────────────────────────────────────
+//
+//   mfa_already_enrolled      FAILED_PRECONDITION    400     User already has an active MFA factor enrolled.
+//   mfa_invalid_code          UNAUTHENTICATED        401     The provided TOTP or OTP code is incorrect.
+//   mfa_session_expired       UNAUTHENTICATED        401     The MFA challenge session has expired; restart login.
+//   invalid_mfa_session       UNAUTHENTICATED        401     The MFA session token is invalid or does not match.
+
+// ── Verification ────────────────────────────────────────────────────────────
+//
+//   invalid_otp               UNAUTHENTICATED        401     The OTP code is incorrect.
+//   otp_expired               UNAUTHENTICATED        401     The OTP code has expired.
+//   already_verified          FAILED_PRECONDITION    400     The email or phone is already verified.
+//   phone_not_set             FAILED_PRECONDITION    400     No phone number is associated with this account.
+
+// ── Session ──────────────────────────────────────────────────────────────────
+//
+//   session_not_found         NOT_FOUND              404     No session exists with the given ID.
+//   session_not_owned         PERMISSION_DENIED      403     The session belongs to a different user.
+
+// ── OAuth2 ───────────────────────────────────────────────────────────────────
+//
+//   unsupported_provider      INVALID_ARGUMENT       400     The requested OAuth2 provider is not configured.
+//   oauth_code_invalid        UNAUTHENTICATED        401     The authorization code from the provider is invalid or expired.
+//   account_link_required     FAILED_PRECONDITION    400     Provider email matches an existing account; linking is required.
+//   provider_already_linked   FAILED_PRECONDITION    400     This provider is already linked to the account.
+//   provider_not_linked       NOT_FOUND              404     The requested provider is not linked to this account.
+//   cannot_unlink_last_credential FAILED_PRECONDITION 400   Cannot unlink the only remaining login method.
+
+// ── Network & Rate Limiting ──────────────────────────────────────────────────
+//
+//   too_many_requests         RESOURCE_EXHAUSTED     429     Rate limit exceeded for this endpoint, IP, or account.
+//   ip_not_allowed            PERMISSION_DENIED      403     The request IP is not within the tenant's allowed CIDR ranges.
+
+// ---------------------------------------------------------------------------
+// Error Response Shape (grpc-gateway JSON)
+//
+// All errors are returned in the google.rpc.Status format:
+//
+// {
+//   "code": 16,                        // gRPC numeric status code
+//   "message": "human-readable string", // NOT for programmatic use
+//   "details": [
+//     {
+//       "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+//       "reason": "invalid_credentials",  // <-- switch on this
+//       "domain": "core-auth",
+//       "metadata": {                     // optional, error-specific context
+//         "retry_after": "30"             // e.g. for account_locked or too_many_requests
+//       }
+//     }
+//   ]
+// }
+// ---------------------------------------------------------------------------
+
+// ErrorReason provides a strongly-typed enum for the `reason` field in google.rpc.ErrorInfo.
+// Using this enum ensures that clients and servers use the exact same string
+// identifiers for error handling.
+enum ErrorReason {
+  ERROR_REASON_UNSPECIFIED = 0;
+
+  // ── Identity & Account ──
+  USER_NOT_FOUND = 1;
+  USER_ALREADY_EXISTS = 2;
+  ACCOUNT_NOT_VERIFIED = 3;
+  ACCOUNT_SUSPENDED = 4;
+  ACCOUNT_DELETED = 5;
+  ACCOUNT_LOCKED = 6;
+
+  // ── Credentials & Tokens ──
+  INVALID_CREDENTIALS = 7;
+  INVALID_TOKEN = 8;
+  TOKEN_EXPIRED = 9;
+  TOKEN_ALREADY_USED = 10;
+  TOKEN_REUSE_DETECTED = 11;
+
+  // ── Input Validation ──
+  PASSWORD_POLICY_VIOLATION = 12;
+  INVALID_IDENTIFIER_FORMAT = 13;
+
+  // ── MFA ──
+  MFA_ALREADY_ENROLLED = 14;
+  MFA_INVALID_CODE = 15;
+  MFA_SESSION_EXPIRED = 16;
+  INVALID_MFA_SESSION = 17;
+
+  // ── Verification ──
+  INVALID_OTP = 18;
+  OTP_EXPIRED = 19;
+  ALREADY_VERIFIED = 20;
+  PHONE_NOT_SET = 21;
+
+  // ── Session ──
+  SESSION_NOT_FOUND = 22;
+  SESSION_NOT_OWNED = 23;
+
+  // ── OAuth2 ──
+  UNSUPPORTED_PROVIDER = 24;
+  OAUTH_CODE_INVALID = 25;
+  ACCOUNT_LINK_REQUIRED = 26;
+  PROVIDER_ALREADY_LINKED = 27;
+  PROVIDER_NOT_LINKED = 28;
+  CANNOT_UNLINK_LAST_CREDENTIAL = 29;
+
+  // ── Network & Rate Limiting ──
+  TOO_MANY_REQUESTS = 30;
+  IP_NOT_ALLOWED = 31;
+}
