@@ -64,6 +64,12 @@ migrate-create:
 	@read -p "Migration name: " name; \
 	goose -dir migrations create $$name sql
 
+db-shell:
+	docker exec -it core-auth-postgres psql -U core_auth -d core_auth
+
+redis-shell:
+	docker exec -it core-auth-redis redis-cli
+
 # docker
 docker-up:
 	docker compose up -d
