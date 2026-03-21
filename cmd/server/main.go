@@ -1,4 +1,4 @@
-package server
+package main
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatal("fatal: %v", err)
+		log.Fatalf("fatal: %v", err)
 	}
 }
 
