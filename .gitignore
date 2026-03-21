@@ -293,3 +293,4 @@ _example/grpc/grpc/
 minato/
 # Air build output
 tmp/
+keys/

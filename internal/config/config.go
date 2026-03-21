@@ -11,6 +11,10 @@ type Config struct {
 	HTTPPort    int    `env:"HTTP_PORT" envDefault:"8080"`
 	DatabaseURL string `env:"DATABASE_URL,required"`
 	RedisURL    string `env:"REDIS_URL,required"`
+
+	// JWT
+	RSAPrivateKeyPath string `env:"RSA_PRIVATE_KEY_PATH,required"`
+	JWTIssuer         string `env:"JWT_ISSUER,required"`
 }
 
 // Load reads .env (if present) and parses environment variables into Config.
