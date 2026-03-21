@@ -12,14 +12,16 @@ import (
 
 // Service implements authv1.AuthServiceServer.
 type Service struct {
-	// UnimplementedAuthServiceServer ensures forward compatibility when new RPCs are added in later phases.
+	// UnimplementedAuthServiceServer ensures forward compatibility when new RPCs are added in the future.
 	authv1.UnimplementedAuthServiceServer
-	repo UserRepository
+	repo     UserRepository
+	tokenSvc *TokenService
 }
 
 // NewService constructs an auth service with the given repository.
-func NewService(repo UserRepository) *Service {
-	return &Service{repo: repo}
+func NewService(repo UserRepository, tokenSvc *TokenService) *Service {
+	return &Service{repo: repo, tokenSvc: tokenSvc}
+
 }
 
 // Register
@@ -76,9 +78,16 @@ func (s *Service) Register(ctx context.Context, req *authv1.RegisterRequest) (*a
 		return nil, err // ErrUserAlreadyExists is already a *merr.Error
 	}
 
-	// 6. Build response. Tokens are deferred to Phase 1B.
+	// 6. Generate token pair.
+	tokens, err := s.tokenSvc.GenerateTokenPair(user.ID, user.Role)
+	if err != nil {
+		return nil, merr.Internal("INTERNAL_ERROR", "failed to generate tokens")
+	}
+
+	// 7. Build response.
 	return &authv1.RegisterResponse{
-		User: userToProto(user),
+		User:   userToProto(user),
+		Tokens: tokens,
 	}, nil
 }
 
@@ -120,11 +129,18 @@ func (s *Service) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.
 		return nil, ErrInvalidCredentials
 	}
 
-	// 5. Build response. Tokens are deferred to Phase 1B.
+	// 5. Generate token pair.
+	tokens, err := s.tokenSvc.GenerateTokenPair(user.ID, user.Role)
+	if err != nil {
+		return nil, merr.Internal("INTERNAL_ERROR", "failed to generate tokens")
+	}
+
+	// 6. Build response.
 	return &authv1.LoginResponse{
 		Result: &authv1.LoginResponse_LoginSuccess{
 			LoginSuccess: &authv1.LoginSuccess{
-				User: userToProto(user),
+				User:   userToProto(user),
+				Tokens: tokens,
 			},
 		},
 	}, nil

@@ -10,6 +10,7 @@ import (
 	"github.com/dwikynator/core-auth/internal/auth"
 	authrepo "github.com/dwikynator/core-auth/internal/auth/repository"
 	"github.com/dwikynator/core-auth/internal/config"
+	"github.com/dwikynator/core-auth/internal/crypto"
 	"github.com/dwikynator/core-auth/internal/database"
 	internalredis "github.com/dwikynator/core-auth/internal/redis"
 	"github.com/dwikynator/minato"
@@ -49,11 +50,25 @@ func run() error {
 	}
 	slog.Info("redis connected")
 
-	// 4. Initialize auth domain
-	userRepo := authrepo.NewPostgresUserRepo(db)
-	authSvc := auth.NewService(userRepo)
+	// 4. Initialize JWT infrastructure
+	tokenIssuer, err := crypto.NewTokenIssuer(cfg.RSAPrivateKeyPath, cfg.JWTIssuer)
+	if err != nil {
+		return fmt.Errorf("init token issuer: %w", err)
+	}
+	slog.Info("token issuer ready", "kid", tokenIssuer.KeyID())
 
-	// 5. Create the minato server
+	// Pre-compute JWKS JSON (computed once, served on every request)
+	jwksJSON, err := crypto.BuildJWKS(tokenIssuer.PublicKey(), tokenIssuer.KeyID())
+	if err != nil {
+		return fmt.Errorf("build jwks: %w", err)
+	}
+
+	// 5. Initialize auth domain
+	userRepo := authrepo.NewPostgresUserRepo(db)
+	tokenSvc := auth.NewTokenService(tokenIssuer)
+	authSvc := auth.NewService(userRepo, tokenSvc)
+
+	// 6. Create the minato server
 	grpcAddr := fmt.Sprintf(":%d", cfg.GRPCPort)
 	httpAddr := fmt.Sprintf(":%d", cfg.HTTPPort)
 
@@ -82,7 +97,7 @@ func run() error {
 		}),
 	)
 
-	// 6. Register cross-transport middleware (HTTP + gRPC)
+	// 7. Register cross-transport middleware (HTTP + gRPC)
 	// RecoveryPlugin MUST be first — outermost wrapper catches all panics.
 	server.UsePlugin(
 		middleware.RecoveryPlugin(),
@@ -93,14 +108,16 @@ func run() error {
 	// HTTP-only middleware
 	server.Use(middleware.CORS())
 
-	// 7. Register gRPC services
-	// TODO: Wire up actual handlers
+	// 8. Register gRPC services
 	server.RegisterGRPC(func(s grpc.ServiceRegistrar) {
 		authv1.RegisterAuthServiceServer(s, authSvc)
 	})
 	server.RegisterGateway(authv1.RegisterAuthServiceHandlerFromEndpoint)
 
-	// 8. Start (blocks until SIGINT/SIGTERM)
+	// 9. Register custom HTTP routes (Phase 1B)
+	server.Router().Get("/.well-known/jwks.json", auth.NewJWKSHandler(jwksJSON))
+
+	// 10. Start (blocks until SIGINT/SIGTERM)
 	slog.Info("starting server", "grpc_addr", grpcAddr, "http_addr", httpAddr)
 	return server.Run()
 }
