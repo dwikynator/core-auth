@@ -76,10 +76,8 @@ func run() error {
 	verificationRepo := verificationrepo.NewPostgresVerificationRepo(db)
 
 	tokenSvc := auth.NewTokenService(tokenIssuer)
-	authSvc := auth.NewService(userRepo, tokenSvc)
-
-	// verificationSvc is ready for next phase.
-	_ = verification.NewService(verificationRepo, emailClient, cfg.FrontendURL)
+	verificationSvc := verification.NewService(verificationRepo, emailClient, cfg.FrontendURL)
+	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc)
 	slog.Info("verification service ready")
 
 	// 7. Create the minato server

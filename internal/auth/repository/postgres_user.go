@@ -81,3 +81,88 @@ func (r *postgresUserRepo) FindByLogin(ctx context.Context, identifier string) (
 	}
 	return u, nil
 }
+
+func (r *postgresUserRepo) FindByID(ctx context.Context, userID string) (*auth.User, error) {
+	const query = `
+		SELECT id, email, username, phone, password_hash,
+		       role, status, email_verified_at, phone_verified_at,
+		       created_at, updated_at
+		FROM   users
+		WHERE  id = $1
+		  AND  deleted_at IS NULL
+	`
+
+	u := &auth.User{}
+	err := r.db.QueryRow(ctx, query, userID).Scan(
+		&u.ID,
+		&u.Email,
+		&u.Username,
+		&u.Phone,
+		&u.PasswordHash,
+		&u.Role,
+		&u.Status,
+		&u.EmailVerifiedAt,
+		&u.PhoneVerifiedAt,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, auth.ErrUserNotFound
+		}
+		return nil, err
+	}
+	return u, nil
+}
+
+func (r *postgresUserRepo) FindByEmail(ctx context.Context, email string) (*auth.User, error) {
+	const query = `
+		SELECT id, email, username, phone, password_hash,
+		       role, status, email_verified_at, phone_verified_at,
+		       created_at, updated_at
+		FROM   users
+		WHERE  email = $1
+		  AND  deleted_at IS NULL
+	`
+
+	u := &auth.User{}
+	err := r.db.QueryRow(ctx, query, email).Scan(
+		&u.ID,
+		&u.Email,
+		&u.Username,
+		&u.Phone,
+		&u.PasswordHash,
+		&u.Role,
+		&u.Status,
+		&u.EmailVerifiedAt,
+		&u.PhoneVerifiedAt,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, auth.ErrUserNotFound
+		}
+		return nil, err
+	}
+	return u, nil
+}
+
+func (r *postgresUserRepo) VerifyEmailAndActivate(ctx context.Context, userID string) error {
+	const query = `
+		UPDATE users
+		SET    email_verified_at = COALESCE(email_verified_at, NOW()),
+		       status = CASE WHEN status = 'unverified' THEN 'active' ELSE status END,
+		       updated_at = NOW()
+		WHERE  id = $1 AND deleted_at IS NULL
+	`
+
+	tag, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return auth.ErrUserNotFound
+	}
+	return nil
+}

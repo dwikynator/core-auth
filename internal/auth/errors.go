@@ -11,4 +11,6 @@ var (
 	ErrUserAlreadyExists  = merr.Conflict("USER_ALREADY_EXISTS", "email, username, or phone is already registered")
 	ErrInvalidCredentials = merr.Unauthorized("INVALID_CREDENTIALS", "wrong password or identifier")
 	ErrInvalidIdentifier  = merr.BadRequest("INVALID_IDENTIFIER_FORMAT", "must provide at least one valid identifier (email, username, or phone)")
+	ErrAccountNotVerified = merr.PreconditionFailed("ACCOUNT_NOT_VERIFIED", "account must be verified before logging in")
+	ErrAlreadyVerified    = merr.PreconditionFailed("ALREADY_VERIFIED", "email is already verified")
 )

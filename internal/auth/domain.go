@@ -32,4 +32,16 @@ type UserRepository interface {
 	// FindByLogin looks up a user by email, username, or phone.
 	// Returns ErrUserNotFound if no match exists.
 	FindByLogin(ctx context.Context, identifier string) (*User, error)
+
+	// FindByID looks up a user by their UUID primary key.
+	// Returns ErrUserNotFound if no match exists.
+	FindByID(ctx context.Context, userID string) (*User, error)
+
+	// FindByEmail looks up a user by their normalized email address.
+	// Returns ErrUserNotFound if no match exists.
+	FindByEmail(ctx context.Context, email string) (*User, error)
+
+	// VerifyEmailAndActivate atomically sets email_verified_at and changes status to active.
+	// Returns ErrUserNotFound if the user doesn't exist.
+	VerifyEmailAndActivate(ctx context.Context, userID string) error
 }
