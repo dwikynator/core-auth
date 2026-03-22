@@ -15,6 +15,11 @@ type Config struct {
 	// JWT
 	RSAPrivateKeyPath string `env:"RSA_PRIVATE_KEY_PATH,required"`
 	JWTIssuer         string `env:"JWT_ISSUER,required"`
+
+	// Email & Verification ──
+	ResendAPIKey string `env:"RESEND_API_KEY,required"`
+	ResendFrom   string `env:"RESEND_FROM" envDefault:"onboarding@resend.dev"`
+	FrontendURL  string `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
 }
 
 // Load reads .env (if present) and parses environment variables into Config.
