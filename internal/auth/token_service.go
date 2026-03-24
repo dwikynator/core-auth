@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/dwikynator/core-auth/internal/crypto"
 )
 
-// Default token lifetimes. These will become per-tenant configurable in the future.
+// Default token lifetimes. These will become per-tenant configurable in Phase 3C.
 const (
 	DefaultAccessTokenTTL  = 15 * time.Minute
 	DefaultRefreshTokenTTL = 30 * 24 * time.Hour // 30 days
@@ -25,8 +26,17 @@ func NewTokenService(issuer *crypto.TokenIssuer) *TokenService {
 	return &TokenService{issuer: issuer}
 }
 
+// TokenPairResult contains the generated tokens and the refresh token hash
+// needed for session storage. The hash is never sent to the client.
+type TokenPairResult struct {
+	TokenPair        *authv1.TokenPair
+	RefreshTokenHash string
+}
+
 // GenerateTokenPair creates a signed access token and an opaque refresh token.
-func (ts *TokenService) GenerateTokenPair(userID, role string) (*authv1.TokenPair, error) {
+// Returns both the client-facing TokenPair and the SHA-256 hash of the refresh
+// token for session persistence.
+func (ts *TokenService) GenerateTokenPair(userID, role string) (*TokenPairResult, error) {
 	// 1. Sign the access token (RS256 JWT).
 	accessToken, err := ts.issuer.SignAccessToken(userID, role, DefaultAccessTokenTTL)
 	if err != nil {
@@ -34,17 +44,32 @@ func (ts *TokenService) GenerateTokenPair(userID, role string) (*authv1.TokenPai
 	}
 
 	// 2. Generate an opaque refresh token (random 32-byte hex string).
-	// In the future, this will be stored in the `sessions` table for rotation
-	// and revocation tracking. For now, it is stateless.
+	// 2. Generate an opaque refresh token (random 32-byte hex string).
 	refreshBytes := make([]byte, 32)
 	if _, err := rand.Read(refreshBytes); err != nil {
 		return nil, err
 	}
 	refreshToken := hex.EncodeToString(refreshBytes)
 
-	return &authv1.TokenPair{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    int64(DefaultAccessTokenTTL.Seconds()),
+	// 3. Hash the refresh token for storage. We never store the plaintext.
+	// SHA-256 is sufficient here because the input has 256 bits of entropy
+	// (from crypto/rand), making brute-force completely infeasible.
+	hash := sha256.Sum256([]byte(refreshToken))
+	refreshTokenHash := hex.EncodeToString(hash[:])
+
+	return &TokenPairResult{
+		TokenPair: &authv1.TokenPair{
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			ExpiresIn:    int64(DefaultAccessTokenTTL.Seconds()),
+		},
+		RefreshTokenHash: refreshTokenHash,
 	}, nil
+}
+
+// HashRefreshToken computes the SHA-256 hash of a raw refresh token.
+// Used during refresh rotation to look up the session by hash.
+func HashRefreshToken(rawToken string) string {
+	hash := sha256.Sum256([]byte(rawToken))
+	return hex.EncodeToString(hash[:])
 }

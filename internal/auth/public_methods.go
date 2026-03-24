@@ -15,6 +15,7 @@ func PublicMethods() []string {
 	return []string{
 		authv1.AuthService_Register_FullMethodName,
 		authv1.AuthService_Login_FullMethodName,
+		authv1.AuthService_RefreshToken_FullMethodName,
 		authv1.AuthService_SendOTP_FullMethodName,
 		authv1.AuthService_VerifyOTP_FullMethodName,
 		authv1.AuthService_SendMagicLink_FullMethodName,

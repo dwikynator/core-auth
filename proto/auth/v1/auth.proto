@@ -429,9 +429,10 @@ message SendOTPResponse {
 }
 
 message VerifyOTPRequest {
-  string    email_or_phone = 1;
-  OTPTarget target         = 2;
-  string    otp_code       = 3;
+  string    client_id      = 1;
+  string    email_or_phone = 2;
+  OTPTarget target         = 3;
+  string    otp_code       = 4;
 }
 
 message VerifyOTPResponse {

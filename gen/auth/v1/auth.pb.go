@@ -1163,9 +1163,10 @@ func (x *SendOTPResponse) GetExpiresAt() string {
 
 type VerifyOTPRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	EmailOrPhone  string                 `protobuf:"bytes,1,opt,name=email_or_phone,json=emailOrPhone,proto3" json:"email_or_phone,omitempty"`
-	Target        OTPTarget              `protobuf:"varint,2,opt,name=target,proto3,enum=auth.v1.OTPTarget" json:"target,omitempty"`
-	OtpCode       string                 `protobuf:"bytes,3,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"`
+	ClientId      string                 `protobuf:"bytes,1,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
+	EmailOrPhone  string                 `protobuf:"bytes,2,opt,name=email_or_phone,json=emailOrPhone,proto3" json:"email_or_phone,omitempty"`
+	Target        OTPTarget              `protobuf:"varint,3,opt,name=target,proto3,enum=auth.v1.OTPTarget" json:"target,omitempty"`
+	OtpCode       string                 `protobuf:"bytes,4,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1198,6 +1199,13 @@ func (x *VerifyOTPRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use VerifyOTPRequest.ProtoReflect.Descriptor instead.
 func (*VerifyOTPRequest) Descriptor() ([]byte, []int) {
 	return file_auth_v1_auth_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *VerifyOTPRequest) GetClientId() string {
+	if x != nil {
+		return x.ClientId
+	}
+	return ""
 }
 
 func (x *VerifyOTPRequest) GetEmailOrPhone() string {
@@ -2961,11 +2969,12 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\x06target\x18\x02 \x01(\x0e2\x12.auth.v1.OTPTargetR\x06target\"0\n" +
 	"\x0fSendOTPResponse\x12\x1d\n" +
 	"\n" +
-	"expires_at\x18\x01 \x01(\tR\texpiresAt\"\x7f\n" +
-	"\x10VerifyOTPRequest\x12$\n" +
-	"\x0eemail_or_phone\x18\x01 \x01(\tR\femailOrPhone\x12*\n" +
-	"\x06target\x18\x02 \x01(\x0e2\x12.auth.v1.OTPTargetR\x06target\x12\x19\n" +
-	"\botp_code\x18\x03 \x01(\tR\aotpCode\"i\n" +
+	"expires_at\x18\x01 \x01(\tR\texpiresAt\"\x9c\x01\n" +
+	"\x10VerifyOTPRequest\x12\x1b\n" +
+	"\tclient_id\x18\x01 \x01(\tR\bclientId\x12$\n" +
+	"\x0eemail_or_phone\x18\x02 \x01(\tR\femailOrPhone\x12*\n" +
+	"\x06target\x18\x03 \x01(\x0e2\x12.auth.v1.OTPTargetR\x06target\x12\x19\n" +
+	"\botp_code\x18\x04 \x01(\tR\aotpCode\"i\n" +
 	"\x11VerifyOTPResponse\x12(\n" +
 	"\x04user\x18\x01 \x01(\v2\x14.auth.v1.UserProfileR\x04user\x12*\n" +
 	"\x06tokens\x18\x02 \x01(\v2\x12.auth.v1.TokenPairR\x06tokens\"I\n" +

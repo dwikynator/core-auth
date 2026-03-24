@@ -75,10 +75,11 @@ func run() error {
 	userRepo := authrepo.NewPostgresUserRepo(db)
 	verificationRepo := verificationrepo.NewPostgresVerificationRepo(db)
 	blacklistRepo := authrepo.NewRedisBlacklist(rdb)
+	sessionRepo := authrepo.NewPostgresSessionRepo(db)
 
 	tokenSvc := auth.NewTokenService(tokenIssuer)
 	verificationSvc := verification.NewService(verificationRepo, emailClient, cfg.FrontendURL)
-	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc, blacklistRepo)
+	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc, blacklistRepo, sessionRepo)
 
 	tokenValidator := auth.NewTokenValidator(
 		tokenIssuer.PublicKey(),
