@@ -37,9 +37,9 @@ type TokenPairResult struct {
 // The caller provides the access token TTL (tenant-specific or default).
 // Returns both the client-facing TokenPair and the SHA-256 hash of the refresh
 // token for session persistence.
-func (ts *TokenService) GenerateTokenPair(userID, role string, accessTTL time.Duration) (*TokenPairResult, error) {
+func (ts *TokenService) GenerateTokenPair(userID, role string, scopes []string, accessTTL time.Duration) (*TokenPairResult, error) {
 	// 1. Sign the access token (RS256 JWT).
-	accessToken, err := ts.issuer.SignAccessToken(userID, role, accessTTL)
+	accessToken, err := ts.issuer.SignAccessToken(userID, role, scopes, accessTTL)
 	if err != nil {
 		return nil, err
 	}

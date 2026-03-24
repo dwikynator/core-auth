@@ -42,6 +42,7 @@ type TenantConfig struct {
 	ClientID        string
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
+	DefaultScopes   []string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

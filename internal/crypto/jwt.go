@@ -26,7 +26,8 @@ type TokenIssuer struct {
 // Claims defines the JWT payload. Embedding jwt.RegisteredClaims provides
 // standard fields (sub, iss, exp, iat, jti, etc.).
 type Claims struct {
-	Role string `json:"role"`
+	Role   string   `json:"role"`
+	Scopes []string `json:"scope,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -71,7 +72,7 @@ func NewTokenIssuer(keyPath, issuer string) (*TokenIssuer, error) {
 
 // SignAccessToken creates a signed RS256 JWT with the given claims.
 // Each token contains a unique `jti` (JWT ID) used for blacklist-based revocation.
-func (ti *TokenIssuer) SignAccessToken(userID, role string, ttl time.Duration) (string, error) {
+func (ti *TokenIssuer) SignAccessToken(userID, role string, scopes []string, ttl time.Duration) (string, error) {
 	now := time.Now()
 
 	// Generate a unique jti: 16 random bytes → 32-char hex string.
@@ -83,7 +84,8 @@ func (ti *TokenIssuer) SignAccessToken(userID, role string, ttl time.Duration) (
 	}
 
 	claims := Claims{
-		Role: role,
+		Role:   role,
+		Scopes: scopes,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        hex.EncodeToString(jtiBytes),
 			Subject:   userID,

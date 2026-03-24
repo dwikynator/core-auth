@@ -17,6 +17,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// DefaultScopes are assigned when no tenant-specific scopes are configured.
+// These follow the OpenID Connect standard scope set.
+var DefaultScopes = []string{"openid", "profile", "email"}
+
 // requestMeta holds per-request transport metadata used for session creation.
 type requestMeta struct {
 	IPAddress *string
@@ -169,10 +173,13 @@ func (s *Service) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.
 	}
 
 	// 6. Build response.
+	profile := userToProto(user)
+	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
+
 	return &authv1.LoginResponse{
 		Result: &authv1.LoginResponse_LoginSuccess{
 			LoginSuccess: &authv1.LoginSuccess{
-				User:   userToProto(user),
+				User:   profile,
 				Tokens: tokens,
 			},
 		},
@@ -277,8 +284,11 @@ func (s *Service) VerifyOTP(ctx context.Context, req *authv1.VerifyOTPRequest) (
 		return nil, err
 	}
 
+	profile := userToProto(user)
+	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
+
 	return &authv1.VerifyOTPResponse{
-		User:   userToProto(user),
+		User:   profile,
 		Tokens: tokens,
 	}, nil
 }
@@ -341,8 +351,11 @@ func (s *Service) VerifyMagicLink(ctx context.Context, req *authv1.VerifyMagicLi
 		return nil, err
 	}
 
+	profile := userToProto(user)
+	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
+
 	return &authv1.VerifyMagicLinkResponse{
-		User:   userToProto(user),
+		User:   profile,
 		Tokens: tokens,
 	}, nil
 }
@@ -440,23 +453,28 @@ func metaFromContext(ctx context.Context) requestMeta {
 
 // createSessionAndTokens generates a token pair and persists a new session.
 // This is the single entry point for all token-issuing flows.
-// It resolves per-tenant TTLs, falling back to system defaults if no config is found.
+// It resolves per-tenant TTLs and scopes, falling back to system defaults
+// if no config is found.
 func (s *Service) createSessionAndTokens(ctx context.Context, userID, role, clientID string) (*authv1.TokenPair, string, error) {
 	// 1. Resolve tenant-specific TTLs (or fall back to defaults).
 	accessTTL := DefaultAccessTokenTTL
 	refreshTTL := DefaultRefreshTokenTTL
+	scopes := DefaultScopes
 
 	if clientID != "" {
 		tc, err := s.tenantConfigRepo.FindByClientID(ctx, clientID)
 		if err == nil {
 			accessTTL = tc.AccessTokenTTL
 			refreshTTL = tc.RefreshTokenTTL
+			if len(tc.DefaultScopes) > 0 {
+				scopes = tc.DefaultScopes
+			}
 		}
 		// ErrTenantNotFound is silently ignored — use defaults.
 	}
 
 	// 2. Generate token pair with resolved TTLs.
-	result, err := s.tokenSvc.GenerateTokenPair(userID, role, accessTTL)
+	result, err := s.tokenSvc.GenerateTokenPair(userID, role, scopes, accessTTL)
 	if err != nil {
 		return nil, "", merr.Internal(errReasonInternal, "failed to generate tokens")
 	}
@@ -528,15 +546,19 @@ func (s *Service) RefreshToken(ctx context.Context, req *authv1.RefreshTokenRequ
 
 	// 4. Resolve tenant-specific access TTL.
 	accessTTL := DefaultAccessTokenTTL
+	scopes := DefaultScopes
 	if session.ClientID != "" {
 		tc, err := s.tenantConfigRepo.FindByClientID(ctx, session.ClientID)
 		if err == nil {
 			accessTTL = tc.AccessTokenTTL
+			if len(tc.DefaultScopes) > 0 {
+				scopes = tc.DefaultScopes
+			}
 		}
 	}
 
 	// 5. Generate new token pair.
-	result, err := s.tokenSvc.GenerateTokenPair(user.ID, user.Role, accessTTL)
+	result, err := s.tokenSvc.GenerateTokenPair(user.ID, user.Role, scopes, accessTTL)
 	if err != nil {
 		return nil, merr.Internal(errReasonInternal, "failed to generate tokens")
 	}
@@ -735,4 +757,34 @@ func (s *Service) DeleteUser(ctx context.Context, req *authv1.DeleteUserRequest)
 
 	slog.Info("user soft-deleted", "user_id", userID)
 	return &authv1.DeleteUserResponse{}, nil
+}
+
+// resolveScopes returns the scopes for the given client_id, falling back to defaults.
+// This is a read-only lookup — it does NOT modify any state.
+func (s *Service) resolveScopes(ctx context.Context, clientID string) []string {
+	if clientID == "" {
+		return DefaultScopes
+	}
+	tc, err := s.tenantConfigRepo.FindByClientID(ctx, clientID)
+	if err == nil && len(tc.DefaultScopes) > 0 {
+		return tc.DefaultScopes
+	}
+	return DefaultScopes
+}
+
+// requireScope verifies the authenticated caller's token contains the required scope.
+// Returns the claims on success, or a Forbidden error if the scope is missing.
+func requireScope(ctx context.Context, scope string) (*crypto.Claims, error) {
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range claims.Scopes {
+		if s == scope {
+			return claims, nil
+		}
+	}
+
+	return nil, merr.Forbidden("INSUFFICIENT_SCOPE", "token missing required scope: "+scope)
 }

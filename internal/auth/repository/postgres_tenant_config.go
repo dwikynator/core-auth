@@ -49,6 +49,7 @@ func (r *postgresTenantConfigRepo) FindByClientID(ctx context.Context, clientID 
 		SELECT client_id,
 		       EXTRACT(EPOCH FROM access_token_ttl)::bigint,
 		       EXTRACT(EPOCH FROM refresh_token_ttl)::bigint,
+			   default_scopes,
 		       created_at, updated_at
 		FROM   tenant_configs
 		WHERE  client_id = $1
@@ -60,6 +61,7 @@ func (r *postgresTenantConfigRepo) FindByClientID(ctx context.Context, clientID 
 		&tc.ClientID,
 		&accessSecs,
 		&refreshSecs,
+		&tc.DefaultScopes,
 		&tc.CreatedAt,
 		&tc.UpdatedAt,
 	)
