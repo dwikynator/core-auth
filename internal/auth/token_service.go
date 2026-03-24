@@ -44,7 +44,6 @@ func (ts *TokenService) GenerateTokenPair(userID, role string) (*TokenPairResult
 	}
 
 	// 2. Generate an opaque refresh token (random 32-byte hex string).
-	// 2. Generate an opaque refresh token (random 32-byte hex string).
 	refreshBytes := make([]byte, 32)
 	if _, err := rand.Read(refreshBytes); err != nil {
 		return nil, err
