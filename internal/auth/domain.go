@@ -36,6 +36,16 @@ type Session struct {
 	LastUsedAt       time.Time
 }
 
+// TenantConfig holds per-tenant token lifetime settings.
+// If no config is found for a client_id, the system defaults are used.
+type TenantConfig struct {
+	ClientID        string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 // UserRepository defines the persistence contract for user operations.
 // Implementations live in internal/auth/repository/.
 type UserRepository interface {
@@ -59,6 +69,14 @@ type UserRepository interface {
 	// VerifyEmailAndActivate atomically sets email_verified_at and changes status to active.
 	// Returns ErrUserNotFound if the user doesn't exist.
 	VerifyEmailAndActivate(ctx context.Context, userID string) error
+
+	// UpdateStatus changes the user's status column (e.g., "active", "suspended").
+	// Returns ErrUserNotFound if the user doesn't exist or is soft-deleted.
+	UpdateStatus(ctx context.Context, userID string, status string) error
+
+	// SoftDelete sets deleted_at = NOW() and status = "deleted" for the user.
+	// Returns ErrUserNotFound if the user doesn't exist or is already deleted.
+	SoftDelete(ctx context.Context, userID string) error
 }
 
 // TokenBlacklistRepository defines the contract for token revocation storage.
@@ -103,4 +121,12 @@ type SessionRepository interface {
 	// ListActiveByUser returns all non-revoked, non-expired sessions for a user,
 	// ordered by most recently created.
 	ListActiveByUser(ctx context.Context, userID string) ([]*Session, error)
+}
+
+// TenantConfigRepository defines the persistence contract for tenant config lookups.
+// Implementations should cache aggressively — this data changes very rarely.
+type TenantConfigRepository interface {
+	// FindByClientID returns the tenant config for the given client_id.
+	// Returns ErrTenantNotFound if no config exists for this client.
+	FindByClientID(ctx context.Context, clientID string) (*TenantConfig, error)
 }

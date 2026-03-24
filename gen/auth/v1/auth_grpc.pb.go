@@ -43,6 +43,9 @@ const (
 	AuthService_OAuthCallback_FullMethodName               = "/auth.v1.AuthService/OAuthCallback"
 	AuthService_LinkProvider_FullMethodName                = "/auth.v1.AuthService/LinkProvider"
 	AuthService_UnlinkProvider_FullMethodName              = "/auth.v1.AuthService/UnlinkProvider"
+	AuthService_SuspendUser_FullMethodName                 = "/auth.v1.AuthService/SuspendUser"
+	AuthService_UnsuspendUser_FullMethodName               = "/auth.v1.AuthService/UnsuspendUser"
+	AuthService_DeleteUser_FullMethodName                  = "/auth.v1.AuthService/DeleteUser"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -206,6 +209,23 @@ type AuthServiceClient interface {
 	//	NOT_FOUND/provider_not_linked
 	//	FAILED_PRECONDITION/cannot_unlink_last_credential
 	UnlinkProvider(ctx context.Context, in *UnlinkProviderRequest, opts ...grpc.CallOption) (*UnlinkProviderResponse, error)
+	// Suspend a user account. Revokes all active sessions immediately.
+	// Requires admin role.
+	//
+	// Errors: NOT_FOUND/user_not_found
+	//
+	//	PERMISSION_DENIED/account_suspended (already suspended)
+	SuspendUser(ctx context.Context, in *SuspendUserRequest, opts ...grpc.CallOption) (*SuspendUserResponse, error)
+	// Unsuspend a previously suspended user account.
+	// Requires admin role.
+	//
+	// Errors: NOT_FOUND/user_not_found
+	UnsuspendUser(ctx context.Context, in *UnsuspendUserRequest, opts ...grpc.CallOption) (*UnsuspendUserResponse, error)
+	// Soft-delete a user account. Sets deleted_at and revokes all sessions.
+	// Requires admin role.
+	//
+	// Errors: NOT_FOUND/user_not_found
+	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error)
 }
 
 type authServiceClient struct {
@@ -456,6 +476,36 @@ func (c *authServiceClient) UnlinkProvider(ctx context.Context, in *UnlinkProvid
 	return out, nil
 }
 
+func (c *authServiceClient) SuspendUser(ctx context.Context, in *SuspendUserRequest, opts ...grpc.CallOption) (*SuspendUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SuspendUserResponse)
+	err := c.cc.Invoke(ctx, AuthService_SuspendUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) UnsuspendUser(ctx context.Context, in *UnsuspendUserRequest, opts ...grpc.CallOption) (*UnsuspendUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnsuspendUserResponse)
+	err := c.cc.Invoke(ctx, AuthService_UnsuspendUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteUserResponse)
+	err := c.cc.Invoke(ctx, AuthService_DeleteUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -617,6 +667,23 @@ type AuthServiceServer interface {
 	//	NOT_FOUND/provider_not_linked
 	//	FAILED_PRECONDITION/cannot_unlink_last_credential
 	UnlinkProvider(context.Context, *UnlinkProviderRequest) (*UnlinkProviderResponse, error)
+	// Suspend a user account. Revokes all active sessions immediately.
+	// Requires admin role.
+	//
+	// Errors: NOT_FOUND/user_not_found
+	//
+	//	PERMISSION_DENIED/account_suspended (already suspended)
+	SuspendUser(context.Context, *SuspendUserRequest) (*SuspendUserResponse, error)
+	// Unsuspend a previously suspended user account.
+	// Requires admin role.
+	//
+	// Errors: NOT_FOUND/user_not_found
+	UnsuspendUser(context.Context, *UnsuspendUserRequest) (*UnsuspendUserResponse, error)
+	// Soft-delete a user account. Sets deleted_at and revokes all sessions.
+	// Requires admin role.
+	//
+	// Errors: NOT_FOUND/user_not_found
+	DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -698,6 +765,15 @@ func (UnimplementedAuthServiceServer) LinkProvider(context.Context, *LinkProvide
 }
 func (UnimplementedAuthServiceServer) UnlinkProvider(context.Context, *UnlinkProviderRequest) (*UnlinkProviderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UnlinkProvider not implemented")
+}
+func (UnimplementedAuthServiceServer) SuspendUser(context.Context, *SuspendUserRequest) (*SuspendUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SuspendUser not implemented")
+}
+func (UnimplementedAuthServiceServer) UnsuspendUser(context.Context, *UnsuspendUserRequest) (*UnsuspendUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnsuspendUser not implemented")
+}
+func (UnimplementedAuthServiceServer) DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteUser not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -1152,6 +1228,60 @@ func _AuthService_UnlinkProvider_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_SuspendUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SuspendUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).SuspendUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_SuspendUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).SuspendUser(ctx, req.(*SuspendUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_UnsuspendUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnsuspendUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).UnsuspendUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_UnsuspendUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).UnsuspendUser(ctx, req.(*UnsuspendUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_DeleteUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).DeleteUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_DeleteUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).DeleteUser(ctx, req.(*DeleteUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1254,6 +1384,18 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UnlinkProvider",
 			Handler:    _AuthService_UnlinkProvider_Handler,
+		},
+		{
+			MethodName: "SuspendUser",
+			Handler:    _AuthService_SuspendUser_Handler,
+		},
+		{
+			MethodName: "UnsuspendUser",
+			Handler:    _AuthService_UnsuspendUser_Handler,
+		},
+		{
+			MethodName: "DeleteUser",
+			Handler:    _AuthService_DeleteUser_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

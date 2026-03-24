@@ -34,11 +34,12 @@ type TokenPairResult struct {
 }
 
 // GenerateTokenPair creates a signed access token and an opaque refresh token.
+// The caller provides the access token TTL (tenant-specific or default).
 // Returns both the client-facing TokenPair and the SHA-256 hash of the refresh
 // token for session persistence.
-func (ts *TokenService) GenerateTokenPair(userID, role string) (*TokenPairResult, error) {
+func (ts *TokenService) GenerateTokenPair(userID, role string, accessTTL time.Duration) (*TokenPairResult, error) {
 	// 1. Sign the access token (RS256 JWT).
-	accessToken, err := ts.issuer.SignAccessToken(userID, role, DefaultAccessTokenTTL)
+	accessToken, err := ts.issuer.SignAccessToken(userID, role, accessTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -50,9 +51,7 @@ func (ts *TokenService) GenerateTokenPair(userID, role string) (*TokenPairResult
 	}
 	refreshToken := hex.EncodeToString(refreshBytes)
 
-	// 3. Hash the refresh token for storage. We never store the plaintext.
-	// SHA-256 is sufficient here because the input has 256 bits of entropy
-	// (from crypto/rand), making brute-force completely infeasible.
+	// 3. Hash the refresh token for storage.
 	hash := sha256.Sum256([]byte(refreshToken))
 	refreshTokenHash := hex.EncodeToString(hash[:])
 
@@ -60,7 +59,7 @@ func (ts *TokenService) GenerateTokenPair(userID, role string) (*TokenPairResult
 		TokenPair: &authv1.TokenPair{
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
-			ExpiresIn:    int64(DefaultAccessTokenTTL.Seconds()),
+			ExpiresIn:    int64(accessTTL.Seconds()),
 		},
 		RefreshTokenHash: refreshTokenHash,
 	}, nil

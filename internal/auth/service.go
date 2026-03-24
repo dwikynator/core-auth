@@ -26,11 +26,12 @@ type requestMeta struct {
 // Service implements authv1.AuthServiceServer.
 type Service struct {
 	authv1.UnimplementedAuthServiceServer
-	repo            UserRepository
-	tokenSvc        *TokenService
-	verificationSvc *verification.Service
-	blacklistRepo   TokenBlacklistRepository
-	sessionRepo     SessionRepository
+	repo             UserRepository
+	tokenSvc         *TokenService
+	verificationSvc  *verification.Service
+	blacklistRepo    TokenBlacklistRepository
+	sessionRepo      SessionRepository
+	tenantConfigRepo TenantConfigRepository
 }
 
 // NewService constructs an auth service with the given repository.
@@ -40,13 +41,15 @@ func NewService(
 	verificationSvc *verification.Service,
 	blacklistRepo TokenBlacklistRepository,
 	sessionRepo SessionRepository,
+	tenantConfigRepo TenantConfigRepository,
 ) *Service {
 	return &Service{
-		repo:            repo,
-		tokenSvc:        tokenSvc,
-		verificationSvc: verificationSvc,
-		blacklistRepo:   blacklistRepo,
-		sessionRepo:     sessionRepo,
+		repo:             repo,
+		tokenSvc:         tokenSvc,
+		verificationSvc:  verificationSvc,
+		blacklistRepo:    blacklistRepo,
+		sessionRepo:      sessionRepo,
+		tenantConfigRepo: tenantConfigRepo,
 	}
 }
 
@@ -437,24 +440,38 @@ func metaFromContext(ctx context.Context) requestMeta {
 
 // createSessionAndTokens generates a token pair and persists a new session.
 // This is the single entry point for all token-issuing flows.
+// It resolves per-tenant TTLs, falling back to system defaults if no config is found.
 func (s *Service) createSessionAndTokens(ctx context.Context, userID, role, clientID string) (*authv1.TokenPair, string, error) {
-	// 1. Generate token pair.
-	result, err := s.tokenSvc.GenerateTokenPair(userID, role)
+	// 1. Resolve tenant-specific TTLs (or fall back to defaults).
+	accessTTL := DefaultAccessTokenTTL
+	refreshTTL := DefaultRefreshTokenTTL
+
+	if clientID != "" {
+		tc, err := s.tenantConfigRepo.FindByClientID(ctx, clientID)
+		if err == nil {
+			accessTTL = tc.AccessTokenTTL
+			refreshTTL = tc.RefreshTokenTTL
+		}
+		// ErrTenantNotFound is silently ignored — use defaults.
+	}
+
+	// 2. Generate token pair with resolved TTLs.
+	result, err := s.tokenSvc.GenerateTokenPair(userID, role, accessTTL)
 	if err != nil {
 		return nil, "", merr.Internal(errReasonInternal, "failed to generate tokens")
 	}
 
-	// 2. Extract request metadata.
+	// 3. Extract request metadata.
 	meta := metaFromContext(ctx)
 
-	// 3. Persist the session.
+	// 4. Persist the session.
 	session := &Session{
 		UserID:           userID,
 		ClientID:         clientID,
 		RefreshTokenHash: result.RefreshTokenHash,
 		IPAddress:        meta.IPAddress,
 		UserAgent:        meta.UserAgent,
-		ExpiresAt:        time.Now().Add(DefaultRefreshTokenTTL),
+		ExpiresAt:        time.Now().Add(refreshTTL),
 	}
 	if err := s.sessionRepo.Create(ctx, session); err != nil {
 		return nil, "", merr.Internal(errReasonInternal, "failed to create session")
@@ -509,13 +526,22 @@ func (s *Service) RefreshToken(ctx context.Context, req *authv1.RefreshTokenRequ
 		return nil, merr.Forbidden(authv1.ErrorReason_ACCOUNT_SUSPENDED.String(), "account is suspended")
 	}
 
-	// 4. Generate new token pair.
-	result, err := s.tokenSvc.GenerateTokenPair(user.ID, user.Role)
+	// 4. Resolve tenant-specific access TTL.
+	accessTTL := DefaultAccessTokenTTL
+	if session.ClientID != "" {
+		tc, err := s.tenantConfigRepo.FindByClientID(ctx, session.ClientID)
+		if err == nil {
+			accessTTL = tc.AccessTokenTTL
+		}
+	}
+
+	// 5. Generate new token pair.
+	result, err := s.tokenSvc.GenerateTokenPair(user.ID, user.Role, accessTTL)
 	if err != nil {
 		return nil, merr.Internal(errReasonInternal, "failed to generate tokens")
 	}
 
-	// 5. Atomically rotate the refresh token hash.
+	// 6. Atomically rotate the refresh token hash.
 	// If this fails (e.g., concurrent revocation), the old token is already
 	// invalidated and the new one was never stored — safe.
 	if err := s.sessionRepo.RotateRefreshToken(ctx, session.ID, result.RefreshTokenHash); err != nil {
@@ -622,4 +648,91 @@ func (s *Service) RevokeAllSessions(ctx context.Context, req *authv1.RevokeAllSe
 	return &authv1.RevokeAllSessionsResponse{
 		RevokedCount: int32(count),
 	}, nil
+}
+
+// requireAdmin verifies the authenticated caller has the "admin" role.
+func requireAdmin(ctx context.Context) (*crypto.Claims, error) {
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if claims.Role != "admin" {
+		return nil, merr.Forbidden("PERMISSION_DENIED", "admin role required")
+	}
+	return claims, nil
+}
+
+func (s *Service) SuspendUser(ctx context.Context, req *authv1.SuspendUserRequest) (*authv1.SuspendUserResponse, error) {
+	if _, err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+
+	userID := req.GetUserId()
+	if userID == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_USER_NOT_FOUND.String(), "user_id is required")
+	}
+
+	// 1. Verify user exists and is not already suspended/deleted.
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Status == "suspended" {
+		return nil, ErrAccountSuspended
+	}
+
+	// 2. Update status to "suspended".
+	if err := s.repo.UpdateStatus(ctx, userID, "suspended"); err != nil {
+		return nil, merr.Internal(errReasonInternal, "failed to suspend user")
+	}
+
+	// 3. Revoke all active sessions immediately.
+	// The user's existing access tokens will still work until they expire
+	// (max 15 minutes), but they cannot refresh after this point.
+	_, _ = s.sessionRepo.RevokeAllForUser(ctx, userID, "")
+
+	slog.Info("user suspended", "user_id", userID, "reason", req.GetReason())
+	return &authv1.SuspendUserResponse{}, nil
+}
+
+func (s *Service) UnsuspendUser(ctx context.Context, req *authv1.UnsuspendUserRequest) (*authv1.UnsuspendUserResponse, error) {
+	if _, err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+
+	userID := req.GetUserId()
+	if userID == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_USER_NOT_FOUND.String(), "user_id is required")
+	}
+
+	// Update status back to "active".
+	if err := s.repo.UpdateStatus(ctx, userID, "active"); err != nil {
+		return nil, err
+	}
+
+	slog.Info("user unsuspended", "user_id", userID)
+	return &authv1.UnsuspendUserResponse{}, nil
+}
+
+func (s *Service) DeleteUser(ctx context.Context, req *authv1.DeleteUserRequest) (*authv1.DeleteUserResponse, error) {
+	if _, err := requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+
+	userID := req.GetUserId()
+	if userID == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_USER_NOT_FOUND.String(), "user_id is required")
+	}
+
+	// 1. Soft-delete the user (sets deleted_at and status = "deleted").
+	if err := s.repo.SoftDelete(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	// 2. Revoke all active sessions immediately.
+	_, _ = s.sessionRepo.RevokeAllForUser(ctx, userID, "")
+
+	slog.Info("user soft-deleted", "user_id", userID)
+	return &authv1.DeleteUserResponse{}, nil
 }

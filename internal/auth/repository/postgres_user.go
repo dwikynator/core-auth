@@ -166,3 +166,41 @@ func (r *postgresUserRepo) VerifyEmailAndActivate(ctx context.Context, userID st
 	}
 	return nil
 }
+
+func (r *postgresUserRepo) UpdateStatus(ctx context.Context, userID string, status string) error {
+	const query = `
+		UPDATE users
+		SET    status = $2, updated_at = NOW()
+		WHERE  id = $1
+		  AND  deleted_at IS NULL
+	`
+
+	tag, err := r.db.Exec(ctx, query, userID, status)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return auth.ErrUserNotFound
+	}
+	return nil
+}
+
+func (r *postgresUserRepo) SoftDelete(ctx context.Context, userID string) error {
+	const query = `
+		UPDATE users
+		SET    status = 'deleted',
+		       deleted_at = NOW(),
+		       updated_at = NOW()
+		WHERE  id = $1
+		  AND  deleted_at IS NULL
+	`
+
+	tag, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return auth.ErrUserNotFound
+	}
+	return nil
+}

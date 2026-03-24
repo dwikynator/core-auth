@@ -21,6 +21,9 @@ var (
 	ErrSessionNotOwned     = merr.Forbidden(authv1.ErrorReason_SESSION_NOT_OWNED.String(), "session belongs to a different user")
 	ErrTokenReuseDetected  = merr.Unauthorized(authv1.ErrorReason_TOKEN_REUSE_DETECTED.String(), "refresh token reuse detected; all sessions revoked")
 	ErrRefreshTokenExpired = merr.Unauthorized(authv1.ErrorReason_TOKEN_EXPIRED.String(), "refresh token has expired")
+	ErrTenantNotFound      = merr.NotFound("TENANT_NOT_FOUND", "no tenant config found for this client_id")
+	ErrAccountDeleted      = merr.Forbidden(authv1.ErrorReason_ACCOUNT_DELETED.String(), "account has been deleted")
+	ErrAccountSuspended    = merr.Forbidden(authv1.ErrorReason_ACCOUNT_SUSPENDED.String(), "account is suspended")
 )
 
 const (

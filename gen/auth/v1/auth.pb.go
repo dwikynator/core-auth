@@ -2891,6 +2891,254 @@ func (*UnlinkProviderResponse) Descriptor() ([]byte, []int) {
 	return file_auth_v1_auth_proto_rawDescGZIP(), []int{54}
 }
 
+type SuspendUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"` // optional: admin-provided reason for audit logging
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuspendUserRequest) Reset() {
+	*x = SuspendUserRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuspendUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuspendUserRequest) ProtoMessage() {}
+
+func (x *SuspendUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuspendUserRequest.ProtoReflect.Descriptor instead.
+func (*SuspendUserRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *SuspendUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *SuspendUserRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type SuspendUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuspendUserResponse) Reset() {
+	*x = SuspendUserResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuspendUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuspendUserResponse) ProtoMessage() {}
+
+func (x *SuspendUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuspendUserResponse.ProtoReflect.Descriptor instead.
+func (*SuspendUserResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{56}
+}
+
+type UnsuspendUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnsuspendUserRequest) Reset() {
+	*x = UnsuspendUserRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnsuspendUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnsuspendUserRequest) ProtoMessage() {}
+
+func (x *UnsuspendUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnsuspendUserRequest.ProtoReflect.Descriptor instead.
+func (*UnsuspendUserRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *UnsuspendUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type UnsuspendUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnsuspendUserResponse) Reset() {
+	*x = UnsuspendUserResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnsuspendUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnsuspendUserResponse) ProtoMessage() {}
+
+func (x *UnsuspendUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnsuspendUserResponse.ProtoReflect.Descriptor instead.
+func (*UnsuspendUserResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{58}
+}
+
+type DeleteUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserRequest) Reset() {
+	*x = DeleteUserRequest{}
+	mi := &file_auth_v1_auth_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserRequest) ProtoMessage() {}
+
+func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserRequest.ProtoReflect.Descriptor instead.
+func (*DeleteUserRequest) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *DeleteUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type DeleteUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserResponse) Reset() {
+	*x = DeleteUserResponse{}
+	mi := &file_auth_v1_auth_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserResponse) ProtoMessage() {}
+
+func (x *DeleteUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_v1_auth_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserResponse.ProtoReflect.Descriptor instead.
+func (*DeleteUserResponse) Descriptor() ([]byte, []int) {
+	return file_auth_v1_auth_proto_rawDescGZIP(), []int{60}
+}
+
 var File_auth_v1_auth_proto protoreflect.FileDescriptor
 
 const file_auth_v1_auth_proto_rawDesc = "" +
@@ -3059,11 +3307,21 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\x06tokens\x18\x02 \x01(\v2\x12.auth.v1.TokenPairR\x06tokens\"3\n" +
 	"\x15UnlinkProviderRequest\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\"\x18\n" +
-	"\x16UnlinkProviderResponse*S\n" +
+	"\x16UnlinkProviderResponse\"E\n" +
+	"\x12SuspendUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x15\n" +
+	"\x13SuspendUserResponse\"/\n" +
+	"\x14UnsuspendUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x17\n" +
+	"\x15UnsuspendUserResponse\",\n" +
+	"\x11DeleteUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"\x14\n" +
+	"\x12DeleteUserResponse*S\n" +
 	"\tOTPTarget\x12\x1a\n" +
 	"\x16OTP_TARGET_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10OTP_TARGET_EMAIL\x10\x01\x12\x14\n" +
-	"\x10OTP_TARGET_PHONE\x10\x022\xcb\x14\n" +
+	"\x10OTP_TARGET_PHONE\x10\x022\xad\x17\n" +
 	"\vAuthService\x12]\n" +
 	"\bRegister\x12\x18.auth.v1.RegisterRequest\x1a\x19.auth.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12Q\n" +
 	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x16.auth.v1.LoginResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12U\n" +
@@ -3089,7 +3347,11 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\vGetOAuthURL\x12\x1b.auth.v1.GetOAuthURLRequest\x1a\x1c.auth.v1.GetOAuthURLResponse\"!\x82\xd3\xe4\x93\x02\x1b\x12\x19/v1/auth/oauth/{provider}\x12z\n" +
 	"\rOAuthCallback\x12\x1d.auth.v1.OAuthCallbackRequest\x1a\x1e.auth.v1.OAuthCallbackResponse\"*\x82\xd3\xe4\x93\x02$\x12\"/v1/auth/oauth/{provider}/callback\x12k\n" +
 	"\fLinkProvider\x12\x1c.auth.v1.LinkProviderRequest\x1a\x1d.auth.v1.LinkProviderResponse\"\x1e\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/v1/auth/oauth/link\x12t\n" +
-	"\x0eUnlinkProvider\x12\x1e.auth.v1.UnlinkProviderRequest\x1a\x1f.auth.v1.UnlinkProviderResponse\"!\x82\xd3\xe4\x93\x02\x1b*\x19/v1/auth/oauth/{provider}B4Z2github.com/dwikynator/core-auth/gen/auth/v1;authv1b\x06proto3"
+	"\x0eUnlinkProvider\x12\x1e.auth.v1.UnlinkProviderRequest\x1a\x1f.auth.v1.UnlinkProviderResponse\"!\x82\xd3\xe4\x93\x02\x1b*\x19/v1/auth/oauth/{provider}\x12v\n" +
+	"\vSuspendUser\x12\x1b.auth.v1.SuspendUserRequest\x1a\x1c.auth.v1.SuspendUserResponse\",\x82\xd3\xe4\x93\x02&:\x01*\"!/v1/admin/users/{user_id}/suspend\x12~\n" +
+	"\rUnsuspendUser\x12\x1d.auth.v1.UnsuspendUserRequest\x1a\x1e.auth.v1.UnsuspendUserResponse\".\x82\xd3\xe4\x93\x02(:\x01*\"#/v1/admin/users/{user_id}/unsuspend\x12h\n" +
+	"\n" +
+	"DeleteUser\x12\x1a.auth.v1.DeleteUserRequest\x1a\x1b.auth.v1.DeleteUserResponse\"!\x82\xd3\xe4\x93\x02\x1b*\x19/v1/admin/users/{user_id}B4Z2github.com/dwikynator/core-auth/gen/auth/v1;authv1b\x06proto3"
 
 var (
 	file_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -3104,7 +3366,7 @@ func file_auth_v1_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_auth_v1_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
+var file_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 61)
 var file_auth_v1_auth_proto_goTypes = []any{
 	(OTPTarget)(0),                              // 0: auth.v1.OTPTarget
 	(*TokenPair)(nil),                           // 1: auth.v1.TokenPair
@@ -3162,11 +3424,17 @@ var file_auth_v1_auth_proto_goTypes = []any{
 	(*LinkProviderResponse)(nil),                // 53: auth.v1.LinkProviderResponse
 	(*UnlinkProviderRequest)(nil),               // 54: auth.v1.UnlinkProviderRequest
 	(*UnlinkProviderResponse)(nil),              // 55: auth.v1.UnlinkProviderResponse
-	(*timestamppb.Timestamp)(nil),               // 56: google.protobuf.Timestamp
+	(*SuspendUserRequest)(nil),                  // 56: auth.v1.SuspendUserRequest
+	(*SuspendUserResponse)(nil),                 // 57: auth.v1.SuspendUserResponse
+	(*UnsuspendUserRequest)(nil),                // 58: auth.v1.UnsuspendUserRequest
+	(*UnsuspendUserResponse)(nil),               // 59: auth.v1.UnsuspendUserResponse
+	(*DeleteUserRequest)(nil),                   // 60: auth.v1.DeleteUserRequest
+	(*DeleteUserResponse)(nil),                  // 61: auth.v1.DeleteUserResponse
+	(*timestamppb.Timestamp)(nil),               // 62: google.protobuf.Timestamp
 }
 var file_auth_v1_auth_proto_depIdxs = []int32{
-	56, // 0: auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	56, // 1: auth.v1.Session.last_used_at:type_name -> google.protobuf.Timestamp
+	62, // 0: auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	62, // 1: auth.v1.Session.last_used_at:type_name -> google.protobuf.Timestamp
 	3,  // 2: auth.v1.RegisterResponse.user:type_name -> auth.v1.UserProfile
 	1,  // 3: auth.v1.RegisterResponse.tokens:type_name -> auth.v1.TokenPair
 	8,  // 4: auth.v1.LoginResponse.login_success:type_name -> auth.v1.LoginSuccess
@@ -3214,32 +3482,38 @@ var file_auth_v1_auth_proto_depIdxs = []int32{
 	48, // 46: auth.v1.AuthService.OAuthCallback:input_type -> auth.v1.OAuthCallbackRequest
 	52, // 47: auth.v1.AuthService.LinkProvider:input_type -> auth.v1.LinkProviderRequest
 	54, // 48: auth.v1.AuthService.UnlinkProvider:input_type -> auth.v1.UnlinkProviderRequest
-	5,  // 49: auth.v1.AuthService.Register:output_type -> auth.v1.RegisterResponse
-	7,  // 50: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
-	11, // 51: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
-	13, // 52: auth.v1.AuthService.RefreshToken:output_type -> auth.v1.RefreshTokenResponse
-	15, // 53: auth.v1.AuthService.GetMe:output_type -> auth.v1.GetMeResponse
-	17, // 54: auth.v1.AuthService.ChangePassword:output_type -> auth.v1.ChangePasswordResponse
-	19, // 55: auth.v1.AuthService.SendOTP:output_type -> auth.v1.SendOTPResponse
-	21, // 56: auth.v1.AuthService.VerifyOTP:output_type -> auth.v1.VerifyOTPResponse
-	23, // 57: auth.v1.AuthService.SendMagicLink:output_type -> auth.v1.SendMagicLinkResponse
-	25, // 58: auth.v1.AuthService.VerifyMagicLink:output_type -> auth.v1.VerifyMagicLinkResponse
-	27, // 59: auth.v1.AuthService.ForgotPassword:output_type -> auth.v1.ForgotPasswordResponse
-	29, // 60: auth.v1.AuthService.ResetPassword:output_type -> auth.v1.ResetPasswordResponse
-	31, // 61: auth.v1.AuthService.SetupTOTP:output_type -> auth.v1.SetupTOTPResponse
-	33, // 62: auth.v1.AuthService.ConfirmTOTP:output_type -> auth.v1.ConfirmTOTPResponse
-	35, // 63: auth.v1.AuthService.ChallengeMFA:output_type -> auth.v1.ChallengeMFAResponse
-	37, // 64: auth.v1.AuthService.DisableMFA:output_type -> auth.v1.DisableMFAResponse
-	39, // 65: auth.v1.AuthService.GetWhatsAppVerificationLink:output_type -> auth.v1.GetWhatsAppVerificationLinkResponse
-	41, // 66: auth.v1.AuthService.ListSessions:output_type -> auth.v1.ListSessionsResponse
-	43, // 67: auth.v1.AuthService.RevokeSession:output_type -> auth.v1.RevokeSessionResponse
-	45, // 68: auth.v1.AuthService.RevokeAllSessions:output_type -> auth.v1.RevokeAllSessionsResponse
-	47, // 69: auth.v1.AuthService.GetOAuthURL:output_type -> auth.v1.GetOAuthURLResponse
-	49, // 70: auth.v1.AuthService.OAuthCallback:output_type -> auth.v1.OAuthCallbackResponse
-	53, // 71: auth.v1.AuthService.LinkProvider:output_type -> auth.v1.LinkProviderResponse
-	55, // 72: auth.v1.AuthService.UnlinkProvider:output_type -> auth.v1.UnlinkProviderResponse
-	49, // [49:73] is the sub-list for method output_type
-	25, // [25:49] is the sub-list for method input_type
+	56, // 49: auth.v1.AuthService.SuspendUser:input_type -> auth.v1.SuspendUserRequest
+	58, // 50: auth.v1.AuthService.UnsuspendUser:input_type -> auth.v1.UnsuspendUserRequest
+	60, // 51: auth.v1.AuthService.DeleteUser:input_type -> auth.v1.DeleteUserRequest
+	5,  // 52: auth.v1.AuthService.Register:output_type -> auth.v1.RegisterResponse
+	7,  // 53: auth.v1.AuthService.Login:output_type -> auth.v1.LoginResponse
+	11, // 54: auth.v1.AuthService.Logout:output_type -> auth.v1.LogoutResponse
+	13, // 55: auth.v1.AuthService.RefreshToken:output_type -> auth.v1.RefreshTokenResponse
+	15, // 56: auth.v1.AuthService.GetMe:output_type -> auth.v1.GetMeResponse
+	17, // 57: auth.v1.AuthService.ChangePassword:output_type -> auth.v1.ChangePasswordResponse
+	19, // 58: auth.v1.AuthService.SendOTP:output_type -> auth.v1.SendOTPResponse
+	21, // 59: auth.v1.AuthService.VerifyOTP:output_type -> auth.v1.VerifyOTPResponse
+	23, // 60: auth.v1.AuthService.SendMagicLink:output_type -> auth.v1.SendMagicLinkResponse
+	25, // 61: auth.v1.AuthService.VerifyMagicLink:output_type -> auth.v1.VerifyMagicLinkResponse
+	27, // 62: auth.v1.AuthService.ForgotPassword:output_type -> auth.v1.ForgotPasswordResponse
+	29, // 63: auth.v1.AuthService.ResetPassword:output_type -> auth.v1.ResetPasswordResponse
+	31, // 64: auth.v1.AuthService.SetupTOTP:output_type -> auth.v1.SetupTOTPResponse
+	33, // 65: auth.v1.AuthService.ConfirmTOTP:output_type -> auth.v1.ConfirmTOTPResponse
+	35, // 66: auth.v1.AuthService.ChallengeMFA:output_type -> auth.v1.ChallengeMFAResponse
+	37, // 67: auth.v1.AuthService.DisableMFA:output_type -> auth.v1.DisableMFAResponse
+	39, // 68: auth.v1.AuthService.GetWhatsAppVerificationLink:output_type -> auth.v1.GetWhatsAppVerificationLinkResponse
+	41, // 69: auth.v1.AuthService.ListSessions:output_type -> auth.v1.ListSessionsResponse
+	43, // 70: auth.v1.AuthService.RevokeSession:output_type -> auth.v1.RevokeSessionResponse
+	45, // 71: auth.v1.AuthService.RevokeAllSessions:output_type -> auth.v1.RevokeAllSessionsResponse
+	47, // 72: auth.v1.AuthService.GetOAuthURL:output_type -> auth.v1.GetOAuthURLResponse
+	49, // 73: auth.v1.AuthService.OAuthCallback:output_type -> auth.v1.OAuthCallbackResponse
+	53, // 74: auth.v1.AuthService.LinkProvider:output_type -> auth.v1.LinkProviderResponse
+	55, // 75: auth.v1.AuthService.UnlinkProvider:output_type -> auth.v1.UnlinkProviderResponse
+	57, // 76: auth.v1.AuthService.SuspendUser:output_type -> auth.v1.SuspendUserResponse
+	59, // 77: auth.v1.AuthService.UnsuspendUser:output_type -> auth.v1.UnsuspendUserResponse
+	61, // 78: auth.v1.AuthService.DeleteUser:output_type -> auth.v1.DeleteUserResponse
+	52, // [52:79] is the sub-list for method output_type
+	25, // [25:52] is the sub-list for method input_type
 	25, // [25:25] is the sub-list for extension type_name
 	25, // [25:25] is the sub-list for extension extendee
 	0,  // [0:25] is the sub-list for field type_name
@@ -3264,7 +3538,7 @@ func file_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_v1_auth_proto_rawDesc), len(file_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   55,
+			NumMessages:   61,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
