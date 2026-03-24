@@ -204,3 +204,21 @@ func (r *postgresUserRepo) SoftDelete(ctx context.Context, userID string) error 
 	}
 	return nil
 }
+
+func (r *postgresUserRepo) UpdatePhoneVerified(ctx context.Context, userID string) error {
+	const query = `
+		UPDATE users
+		SET    phone_verified_at = NOW(),
+		       updated_at = NOW()
+		WHERE  id = $1
+		  AND  phone_verified_at IS NULL
+	`
+	result, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return auth.ErrPhoneAlreadyVerified
+	}
+	return nil
+}

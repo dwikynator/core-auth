@@ -2,8 +2,10 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -37,6 +39,7 @@ type Service struct {
 	sessionRepo      SessionRepository
 	tenantConfigRepo TenantConfigRepository
 	mfaSvc           *MFAService
+	whatsappPhone    string // E.164 WhatsApp Business phone number
 }
 
 // NewService constructs an auth service with the given repository.
@@ -48,6 +51,7 @@ func NewService(
 	sessionRepo SessionRepository,
 	tenantConfigRepo TenantConfigRepository,
 	mfaSvc *MFAService,
+	whatsappPhone string,
 ) *Service {
 	return &Service{
 		repo:             repo,
@@ -57,6 +61,7 @@ func NewService(
 		sessionRepo:      sessionRepo,
 		tenantConfigRepo: tenantConfigRepo,
 		mfaSvc:           mfaSvc,
+		whatsappPhone:    whatsappPhone,
 	}
 }
 
@@ -279,8 +284,8 @@ func (s *Service) SendOTP(ctx context.Context, req *authv1.SendOTPRequest) (*aut
 // VerifyOTP verifies a 6-digit OTP code and activates the user's account.
 func (s *Service) VerifyOTP(ctx context.Context, req *authv1.VerifyOTPRequest) (*authv1.VerifyOTPResponse, error) {
 	// 1. Validate input.
-	emailAddr := strings.ToLower(strings.TrimSpace(req.GetEmailOrPhone()))
-	if emailAddr == "" {
+	identifier := strings.ToLower(strings.TrimSpace(req.GetEmailOrPhone()))
+	if identifier == "" {
 		return nil, merr.BadRequest(authv1.ErrorReason_INVALID_IDENTIFIER_FORMAT.String(), "email_or_phone is required")
 	}
 	if req.GetOtpCode() == "" {
@@ -288,23 +293,39 @@ func (s *Service) VerifyOTP(ctx context.Context, req *authv1.VerifyOTPRequest) (
 	}
 
 	// 2. Validate the OTP token. This marks it as "used" on success.
-	token, err := s.verificationSvc.ValidateToken(ctx, req.GetOtpCode(), verification.TokenTypeOTP)
+	vToken, err := s.verificationSvc.ValidateToken(ctx, req.GetOtpCode(), verification.TokenTypeOTP)
 	if err != nil {
-		return nil, err // ErrTokenNotFound, ErrTokenExpired, or ErrTokenAlreadyUsed
+		return nil, err
 	}
 
-	// 3. Atomically verify email and activate the account.
-	if err := s.repo.VerifyEmailAndActivate(ctx, token.UserID); err != nil {
-		return nil, merr.Internal(errReasonInternal, "failed to verify and activate account")
-	}
-
-	// 4. Fetch the updated user.
-	user, err := s.repo.FindByID(ctx, token.UserID)
+	// 3. Look up the user associated with the OTP.
+	user, err := s.repo.FindByID(ctx, vToken.UserID)
 	if err != nil {
-		return nil, merr.Internal(errReasonInternal, "failed to fetch user")
+		return nil, err
 	}
 
-	// 5. Generate token pair — user is now verified and active.
+	// 4. Branch by target.
+	switch req.GetTarget() {
+	case authv1.OTPTarget_OTP_TARGET_PHONE:
+		// Phone verification — set phone_verified_at.
+		if err := s.repo.UpdatePhoneVerified(ctx, user.ID); err != nil {
+			return nil, err
+		}
+	default:
+		// Email verification (default, backward-compatible behavior).
+		// Atomically mark email as verified and activate the account.
+		if err := s.repo.VerifyEmailAndActivate(ctx, user.ID); err != nil {
+			return nil, err
+		}
+	}
+
+	// 5. Re-fetch the user to get updated verification timestamps.
+	user, err = s.repo.FindByID(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 6. Generate token pair.
 	tokens, _, err := s.createSessionAndTokens(ctx, user.ID, user.Role, req.GetClientId())
 	if err != nil {
 		return nil, err
@@ -941,4 +962,54 @@ func (s *Service) DisableMFA(ctx context.Context, req *authv1.DisableMFARequest)
 	}
 
 	return &authv1.DisableMFAResponse{}, nil
+}
+
+// GetWhatsAppVerificationLink generates a pre-filled WhatsApp message link
+// containing a 6-digit OTP code for phone verification.
+//
+// The returned URL follows the wa.me deep-link format:
+//
+//	https://wa.me/<phone>?text=<encoded_message>
+//
+// The user taps the link, which opens WhatsApp with the verification code
+// pre-typed as a message to the business phone number.
+func (s *Service) GetWhatsAppVerificationLink(ctx context.Context, req *authv1.GetWhatsAppVerificationLinkRequest) (*authv1.GetWhatsAppVerificationLinkResponse, error) {
+	// 1. Get the authenticated user.
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.repo.FindByID(ctx, claims.Subject)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Ensure the user has a phone number set.
+	if user.Phone == nil || *user.Phone == "" {
+		return nil, ErrPhoneNotSet
+	}
+
+	// 3. Reject if phone is already verified.
+	if user.PhoneVerifiedAt != nil {
+		return nil, ErrPhoneAlreadyVerified
+	}
+
+	// 4. Generate a phone OTP (stored in verification_tokens, no email sent).
+	otpCode, expiresAt, err := s.verificationSvc.GeneratePhoneOTP(ctx, user.ID)
+	if err != nil {
+		return nil, merr.Internal(errReasonInternal, "failed to generate phone OTP")
+	}
+
+	// 5. Build the wa.me deep-link URL.
+	// Strip the "+" prefix from the phone number for the wa.me URL format.
+	bizPhone := strings.TrimPrefix(s.whatsappPhone, "+")
+	message := fmt.Sprintf("My verification code is: %s", otpCode)
+	waURL := fmt.Sprintf("https://wa.me/%s?text=%s", bizPhone, url.QueryEscape(message))
+
+	return &authv1.GetWhatsAppVerificationLinkResponse{
+		WhatsappUrl: waURL,
+		OtpCode:     otpCode,
+		ExpiresAt:   expiresAt.Format(time.RFC3339),
+	}, nil
 }

@@ -175,3 +175,34 @@ func (s *Service) ValidateToken(ctx context.Context, rawToken string, tokenType 
 
 	return token, nil
 }
+
+// GeneratePhoneOTP generates a 6-digit OTP and stores its hash, but does NOT
+// send it via email. The raw OTP is returned to the caller for embedding
+// in a WhatsApp pre-filled message link.
+//
+// This reuses the same verification_tokens table as email OTPs.
+// The OTP can be validated via the existing ValidateToken method.
+func (s *Service) GeneratePhoneOTP(ctx context.Context, userID string) (otp string, expiresAt time.Time, err error) {
+	// 1. Invalidate any existing OTPs for this user.
+	if err := s.repo.InvalidateAllForUser(ctx, userID, TokenTypeOTP); err != nil {
+		return "", time.Time{}, fmt.Errorf("invalidate old otps: %w", err)
+	}
+	// 2. Generate OTP.
+	rawOTP, err := crypto.GenerateOTP(OTPDigits)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	// 3. Hash and store.
+	expires := time.Now().Add(OTPExpiry)
+	token := &VerificationToken{
+		UserID:    userID,
+		TokenHash: crypto.HashToken(rawOTP),
+		Type:      TokenTypeOTP,
+		ExpiresAt: expires,
+	}
+	if err := s.repo.Create(ctx, token); err != nil {
+		return "", time.Time{}, fmt.Errorf("store phone otp: %w", err)
+	}
+	slog.Info("phone otp generated", "user_id", userID, "type", "phone_otp", "expires_at", expires)
+	return rawOTP, expires, nil
+}

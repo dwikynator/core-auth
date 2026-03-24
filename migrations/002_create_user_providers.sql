@@ -12,4 +12,4 @@ CREATE TABLE user_providers (
 CREATE INDEX idx_user_providers_user_id ON user_providers(user_id);
 
 -- +goose Down
-DROP TABLE IF EXISTS  user_providers;
+DROP TABLE IF EXISTS user_providers;

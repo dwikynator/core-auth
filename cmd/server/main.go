@@ -90,7 +90,7 @@ func run() error {
 	tokenSvc := auth.NewTokenService(tokenIssuer)
 	verificationSvc := verification.NewService(verificationRepo, emailClient, cfg.FrontendURL)
 	mfaSvc := auth.NewMFAService(mfaCredRepo, mfaSessionStore, mfaKey, cfg.JWTIssuer)
-	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc, blacklistRepo, sessionRepo, tenantConfigRepo, mfaSvc)
+	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc, blacklistRepo, sessionRepo, tenantConfigRepo, mfaSvc, cfg.WhatsAppBusinessPhone)
 
 	tokenValidator := auth.NewTokenValidator(
 		tokenIssuer.PublicKey(),

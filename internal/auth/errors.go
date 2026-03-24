@@ -16,6 +16,7 @@ var (
 	ErrInvalidIdentifier   = merr.BadRequest(authv1.ErrorReason_INVALID_IDENTIFIER_FORMAT.String(), "must provide at least one valid identifier (email, username, or phone)")
 	ErrAccountNotVerified  = merr.PreconditionFailed(authv1.ErrorReason_ACCOUNT_NOT_VERIFIED.String(), "account must be verified before logging in")
 	ErrAlreadyVerified     = merr.PreconditionFailed(authv1.ErrorReason_ALREADY_VERIFIED.String(), "email is already verified")
+	ErrPhoneAlreadyVerified = merr.PreconditionFailed(authv1.ErrorReason_ALREADY_VERIFIED.String(), "phone is already verified")
 	ErrTokenRevoked        = merr.Unauthorized(authv1.ErrorReason_INVALID_TOKEN.String(), "token has been revoked")
 	ErrSessionNotFound     = merr.NotFound(authv1.ErrorReason_SESSION_NOT_FOUND.String(), "session not found")
 	ErrSessionNotOwned     = merr.Forbidden(authv1.ErrorReason_SESSION_NOT_OWNED.String(), "session belongs to a different user")
@@ -29,6 +30,7 @@ var (
 	ErrMFASessionExpired   = merr.Unauthorized(authv1.ErrorReason_MFA_SESSION_EXPIRED.String(), "the MFA session has expired; please login again")
 	ErrInvalidMFASession   = merr.Unauthorized(authv1.ErrorReason_INVALID_MFA_SESSION.String(), "invalid or already consumed MFA session token")
 	ErrMFANotEnrolled      = merr.PreconditionFailed("MFA_NOT_ENROLLED", "MFA is not enrolled for this account")
+	ErrPhoneNotSet         = merr.PreconditionFailed(authv1.ErrorReason_PHONE_NOT_SET.String(), "no phone number is associated with this account")
 )
 
 const (

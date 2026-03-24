@@ -99,6 +99,9 @@ type UserRepository interface {
 	// SoftDelete sets deleted_at = NOW() and status = "deleted" for the user.
 	// Returns ErrUserNotFound if the user doesn't exist or is already deleted.
 	SoftDelete(ctx context.Context, userID string) error
+
+	// UpdatePhoneVerified sets phone_verified_at for the given user.
+	UpdatePhoneVerified(ctx context.Context, userID string) error
 }
 
 // TokenBlacklistRepository defines the contract for token revocation storage.
