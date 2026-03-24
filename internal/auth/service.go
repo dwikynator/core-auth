@@ -477,7 +477,6 @@ func (s *Service) RefreshToken(ctx context.Context, req *authv1.RefreshTokenRequ
 
 	// 1. Look up the session by the hash of the incoming token.
 	hash := HashRefreshToken(rawToken)
-	// return nil, merr.Internal(errReasonInternal, "failed to look up refresh token")
 	session, err := s.sessionRepo.FindByRefreshTokenHash(ctx, hash)
 	if err != nil {
 		if err == ErrSessionNotFound {
