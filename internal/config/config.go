@@ -20,6 +20,8 @@ type Config struct {
 	ResendAPIKey string `env:"RESEND_API_KEY,required"`
 	ResendFrom   string `env:"RESEND_FROM" envDefault:"onboarding@resend.dev"`
 	FrontendURL  string `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
+
+	BaseURL string `env:"BASE_URL" envDefault:"http://localhost:8080"`
 }
 
 // Load reads .env (if present) and parses environment variables into Config.

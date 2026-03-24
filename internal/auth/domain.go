@@ -45,3 +45,16 @@ type UserRepository interface {
 	// Returns ErrUserNotFound if the user doesn't exist.
 	VerifyEmailAndActivate(ctx context.Context, userID string) error
 }
+
+// TokenBlacklistRepository defines the contract for token revocation storage.
+// Implementations live in internal/auth/repository/.
+type TokenBlacklistRepository interface {
+	// Blacklist adds a token's JTI to the blacklist.
+	// The entry automatically expires at expiresAt (matching the token's own expiry),
+	// so Redis memory is strictly bounded to the number of *active* revoked tokens.
+	Blacklist(ctx context.Context, jti string, expiresAt time.Time) error
+
+	// IsBlacklisted checks whether a JTI has been revoked.
+	// Returns false if the JTI is not found (i.e., the token is still valid).
+	IsBlacklisted(ctx context.Context, jti string) (bool, error)
+}

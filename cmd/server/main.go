@@ -74,11 +74,18 @@ func run() error {
 	// 6. Initialize domain services
 	userRepo := authrepo.NewPostgresUserRepo(db)
 	verificationRepo := verificationrepo.NewPostgresVerificationRepo(db)
+	blacklistRepo := authrepo.NewRedisBlacklist(rdb)
 
 	tokenSvc := auth.NewTokenService(tokenIssuer)
 	verificationSvc := verification.NewService(verificationRepo, emailClient, cfg.FrontendURL)
-	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc)
-	slog.Info("verification service ready")
+	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc, blacklistRepo)
+
+	tokenValidator := auth.NewTokenValidator(
+		tokenIssuer.PublicKey(),
+		tokenIssuer.Issuer(),
+		blacklistRepo,
+	)
+	slog.Info("all services ready")
 
 	// 7. Create the minato server
 	grpcAddr := fmt.Sprintf(":%d", cfg.GRPCPort)
@@ -109,7 +116,7 @@ func run() error {
 		}),
 	)
 
-	// 8. Register cross-transport middleware (HTTP + gRPC)
+	// 8. Cross-transport plugins (runs on BOTH HTTP and gRPC perimeters)
 	// RecoveryPlugin MUST be first — outermost wrapper catches all panics.
 	server.UsePlugin(
 		middleware.RecoveryPlugin(),
@@ -117,19 +124,29 @@ func run() error {
 		middleware.LoggerPlugin(),
 	)
 
-	// HTTP-only middleware
+	// HTTP-only middleware (browser / REST concerns)
 	server.Use(middleware.CORS())
 
-	// 9. Register gRPC services
+	// 9. Auth interceptor — gRPC perimeter only (Template C from middleware guide).
+	// The grpc-gateway automatically forwards the HTTP Authorization header as
+	// the gRPC `authorization` metadata key, so every gateway request is
+	// validated exactly once, at the gRPC boundary — no double-execution.
+	server.UseGRPC(middleware.AuthInterceptor(
+		middleware.WithAuthSkipPaths(auth.PublicMethods()...),
+		middleware.WithAuthValidator(tokenValidator.Validate),
+	))
+
+	// 10. Register gRPC services
 	server.RegisterGRPC(func(s grpc.ServiceRegistrar) {
 		authv1.RegisterAuthServiceServer(s, authSvc)
 	})
 	server.RegisterGateway(authv1.RegisterAuthServiceHandlerFromEndpoint)
 
-	// 10. Register custom HTTP routes
+	// 11. Pure HTTP routes (not gRPC-gateway, not subject to gRPC auth interceptor)
 	server.Router().Get("/.well-known/jwks.json", auth.NewJWKSHandler(jwksJSON))
+	server.Router().Get("/.well-known/openid-configuration", auth.NewOIDCDiscoveryHandler(cfg.BaseURL, cfg.JWTIssuer))
 
-	// 11. Start (blocks until SIGINT/SIGTERM)
+	// 12. Start (blocks until SIGINT/SIGTERM)
 	slog.Info("starting server", "grpc_addr", grpcAddr, "http_addr", httpAddr)
 	return server.Run()
 }

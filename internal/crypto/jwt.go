@@ -1,10 +1,12 @@
 package crypto
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"os"
@@ -22,7 +24,7 @@ type TokenIssuer struct {
 }
 
 // Claims defines the JWT payload. Embedding jwt.RegisteredClaims provides
-// standard fields (sub, iss, exp, iat, etc.).
+// standard fields (sub, iss, exp, iat, jti, etc.).
 type Claims struct {
 	Role string `json:"role"`
 	jwt.RegisteredClaims
@@ -68,12 +70,22 @@ func NewTokenIssuer(keyPath, issuer string) (*TokenIssuer, error) {
 }
 
 // SignAccessToken creates a signed RS256 JWT with the given claims.
+// Each token contains a unique `jti` (JWT ID) used for blacklist-based revocation.
 func (ti *TokenIssuer) SignAccessToken(userID, role string, ttl time.Duration) (string, error) {
 	now := time.Now()
+
+	// Generate a unique jti: 16 random bytes → 32-char hex string.
+	// This is the key we store in Redis on logout. Using 16 bytes gives us
+	// 2^128 uniqueness — collision probability is negligible.
+	jtiBytes := make([]byte, 16)
+	if _, err := rand.Read(jtiBytes); err != nil {
+		return "", fmt.Errorf("generate jti: %w", err)
+	}
 
 	claims := Claims{
 		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        hex.EncodeToString(jtiBytes),
 			Subject:   userID,
 			Issuer:    ti.issuer,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -95,4 +107,9 @@ func (ti *TokenIssuer) PublicKey() *rsa.PublicKey {
 // KeyID returns the key ID used in JWT headers and JWKS.
 func (ti *TokenIssuer) KeyID() string {
 	return ti.keyID
+}
+
+// Issuer returns the configured issuer string for OIDC discovery.
+func (ti *TokenIssuer) Issuer() string {
+	return ti.issuer
 }

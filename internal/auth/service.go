@@ -20,14 +20,16 @@ type Service struct {
 	repo            UserRepository
 	tokenSvc        *TokenService
 	verificationSvc *verification.Service
+	blacklistRepo   TokenBlacklistRepository
 }
 
 // NewService constructs an auth service with the given repository.
-func NewService(repo UserRepository, tokenSvc *TokenService, verificationSvc *verification.Service) *Service {
+func NewService(repo UserRepository, tokenSvc *TokenService, verificationSvc *verification.Service, blacklistRepo TokenBlacklistRepository) *Service {
 	return &Service{
 		repo:            repo,
 		tokenSvc:        tokenSvc,
 		verificationSvc: verificationSvc,
+		blacklistRepo:   blacklistRepo,
 	}
 
 }
@@ -324,4 +326,52 @@ func (s *Service) VerifyMagicLink(ctx context.Context, req *authv1.VerifyMagicLi
 		User:   userToProto(user),
 		Tokens: tokens,
 	}, nil
+}
+
+// Logout blacklists the caller's access token so it cannot be used again.
+//
+// The token's JTI is added to the Redis blacklist with a TTL equal to the
+// token's remaining lifetime. This means:
+//   - No unbounded memory growth: entries auto-expire.
+//   - Immediate effect: the very next authenticated request is rejected.
+func (s *Service) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {
+	// 1. Extract the access token from gRPC metadata (Authorization header).
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. The jti (JWT ID) is the blacklist key.
+	jti := claims.ID
+	if jti == "" {
+		return nil, merr.Internal(errReasonInternal, "token missing jti claim")
+	}
+
+	// 3. Blacklist the JTI until the token's natural expiry.
+	if claims.ExpiresAt != nil {
+		if err := s.blacklistRepo.Blacklist(ctx, jti, claims.ExpiresAt.Time); err != nil {
+			return nil, merr.Internal(errReasonInternal, "failed to blacklist token")
+		}
+	}
+
+	return &authv1.LogoutResponse{}, nil
+}
+
+// claimsContextKey is an unexported type to avoid context collisions.
+type claimsContextKey struct{}
+
+// ClaimsContextKey is the key used to store *crypto.Claims in the context.
+// Exported so the auth middleware can inject claims, but the key type is
+// unexported to prevent external packages from overwriting it.
+var ClaimsContextKey = claimsContextKey{}
+
+// claimsFromContext extracts the validated JWT claims injected by the minato
+// auth interceptor. The interceptor stores the return value of Validate,
+// which is *crypto.Claims.
+func claimsFromContext(ctx context.Context) (*crypto.Claims, error) {
+	claims, ok := ctx.Value(ClaimsContextKey).(*crypto.Claims)
+	if !ok || claims == nil {
+		return nil, merr.Unauthorized(authv1.ErrorReason_INVALID_TOKEN.String(), "missing or invalid authentication context")
+	}
+	return claims, nil
 }
