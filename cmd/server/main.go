@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"log/slog"
@@ -77,10 +78,19 @@ func run() error {
 	blacklistRepo := authrepo.NewRedisBlacklist(rdb)
 	sessionRepo := authrepo.NewPostgresSessionRepo(db)
 	tenantConfigRepo := authrepo.NewPostgresTenantConfigRepo(db)
+	mfaCredRepo := authrepo.NewPostgresMFARepo(db)
+	mfaSessionStore := authrepo.NewRedisMFASessionStore(rdb)
+
+	// Parse the MFA encryption key from hex.
+	mfaKey, err := hex.DecodeString(cfg.MFAEncryptionKey)
+	if err != nil || len(mfaKey) != 32 {
+		return fmt.Errorf("MFA_ENCRYPTION_KEY must be 64 hex characters (32 bytes): %w", err)
+	}
 
 	tokenSvc := auth.NewTokenService(tokenIssuer)
 	verificationSvc := verification.NewService(verificationRepo, emailClient, cfg.FrontendURL)
-	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc, blacklistRepo, sessionRepo, tenantConfigRepo)
+	mfaSvc := auth.NewMFAService(mfaCredRepo, mfaSessionStore, mfaKey, cfg.JWTIssuer)
+	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc, blacklistRepo, sessionRepo, tenantConfigRepo, mfaSvc)
 
 	tokenValidator := auth.NewTokenValidator(
 		tokenIssuer.PublicKey(),

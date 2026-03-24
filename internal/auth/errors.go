@@ -24,6 +24,11 @@ var (
 	ErrTenantNotFound      = merr.NotFound("TENANT_NOT_FOUND", "no tenant config found for this client_id")
 	ErrAccountDeleted      = merr.Forbidden(authv1.ErrorReason_ACCOUNT_DELETED.String(), "account has been deleted")
 	ErrAccountSuspended    = merr.Forbidden(authv1.ErrorReason_ACCOUNT_SUSPENDED.String(), "account is suspended")
+	ErrMFAAlreadyEnrolled  = merr.PreconditionFailed(authv1.ErrorReason_MFA_ALREADY_ENROLLED.String(), "MFA is already enrolled for this account")
+	ErrMFAInvalidCode      = merr.Unauthorized(authv1.ErrorReason_MFA_INVALID_CODE.String(), "the TOTP code is incorrect")
+	ErrMFASessionExpired   = merr.Unauthorized(authv1.ErrorReason_MFA_SESSION_EXPIRED.String(), "the MFA session has expired; please login again")
+	ErrInvalidMFASession   = merr.Unauthorized(authv1.ErrorReason_INVALID_MFA_SESSION.String(), "invalid or already consumed MFA session token")
+	ErrMFANotEnrolled      = merr.PreconditionFailed("MFA_NOT_ENROLLED", "MFA is not enrolled for this account")
 )
 
 const (

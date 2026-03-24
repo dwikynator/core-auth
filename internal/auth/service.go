@@ -36,6 +36,7 @@ type Service struct {
 	blacklistRepo    TokenBlacklistRepository
 	sessionRepo      SessionRepository
 	tenantConfigRepo TenantConfigRepository
+	mfaSvc           *MFAService
 }
 
 // NewService constructs an auth service with the given repository.
@@ -46,6 +47,7 @@ func NewService(
 	blacklistRepo TokenBlacklistRepository,
 	sessionRepo SessionRepository,
 	tenantConfigRepo TenantConfigRepository,
+	mfaSvc *MFAService,
 ) *Service {
 	return &Service{
 		repo:             repo,
@@ -54,6 +56,7 @@ func NewService(
 		blacklistRepo:    blacklistRepo,
 		sessionRepo:      sessionRepo,
 		tenantConfigRepo: tenantConfigRepo,
+		mfaSvc:           mfaSvc,
 	}
 }
 
@@ -166,15 +169,38 @@ func (s *Service) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.
 		return nil, ErrInvalidCredentials
 	}
 
-	// 5. Generate token pair.
+	// 5. Check if MFA is enrolled.
+	if s.mfaSvc.IsEnrolled(ctx, user.ID) {
+		// MFA is active — create a short-lived MFA session instead of issuing tokens.
+		mfaToken, err := s.mfaSvc.CreateSession(ctx, &MFASessionData{
+			UserID:   user.ID,
+			ClientID: req.GetClientId(),
+			Role:     user.Role,
+		})
+		if err != nil {
+			return nil, merr.Internal(errReasonInternal, "failed to create MFA session")
+		}
+
+		return &authv1.LoginResponse{
+			Result: &authv1.LoginResponse_MfaRequired{
+				MfaRequired: &authv1.MFARequired{
+					MfaSessionToken: mfaToken,
+					MfaType:         "totp",
+				},
+			},
+		}, nil
+	}
+
+	// 6. No MFA — generate token pair directly.
 	tokens, _, err := s.createSessionAndTokens(ctx, user.ID, user.Role, req.GetClientId())
 	if err != nil {
 		return nil, err
 	}
 
-	// 6. Build response.
+	// 7. Build response.
 	profile := userToProto(user)
 	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
+	profile.MfaEnabled = false
 
 	return &authv1.LoginResponse{
 		Result: &authv1.LoginResponse_LoginSuccess{
@@ -286,6 +312,7 @@ func (s *Service) VerifyOTP(ctx context.Context, req *authv1.VerifyOTPRequest) (
 
 	profile := userToProto(user)
 	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
+	profile.MfaEnabled = s.mfaSvc.IsEnrolled(ctx, user.ID)
 
 	return &authv1.VerifyOTPResponse{
 		User:   profile,
@@ -353,6 +380,7 @@ func (s *Service) VerifyMagicLink(ctx context.Context, req *authv1.VerifyMagicLi
 
 	profile := userToProto(user)
 	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
+	profile.MfaEnabled = s.mfaSvc.IsEnrolled(ctx, user.ID)
 
 	return &authv1.VerifyMagicLinkResponse{
 		User:   profile,
@@ -586,8 +614,12 @@ func (s *Service) GetMe(ctx context.Context, req *authv1.GetMeRequest) (*authv1.
 		return nil, err
 	}
 
+	profile := userToProto(user)
+	profile.Scopes = claims.Scopes
+	profile.MfaEnabled = s.mfaSvc.IsEnrolled(ctx, user.ID)
+
 	return &authv1.GetMeResponse{
-		User: userToProto(user),
+		User: profile,
 	}, nil
 }
 
@@ -787,4 +819,126 @@ func requireScope(ctx context.Context, scope string) (*crypto.Claims, error) {
 	}
 
 	return nil, merr.Forbidden("INSUFFICIENT_SCOPE", "token missing required scope: "+scope)
+}
+
+func (s *Service) SetupTOTP(ctx context.Context, req *authv1.SetupTOTPRequest) (*authv1.SetupTOTPResponse, error) {
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch the user to get their email for the authenticator app display.
+	user, err := s.repo.FindByID(ctx, claims.Subject)
+	if err != nil {
+		return nil, err
+	}
+
+	accountName := user.ID
+	if user.Email != nil {
+		accountName = *user.Email
+	}
+
+	result, err := s.mfaSvc.Setup(ctx, user.ID, accountName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &authv1.SetupTOTPResponse{
+		Secret: result.Secret,
+		QrUri:  result.QRURI,
+	}, nil
+}
+
+func (s *Service) ConfirmTOTP(ctx context.Context, req *authv1.ConfirmTOTPRequest) (*authv1.ConfirmTOTPResponse, error) {
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.GetTotpCode() == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_MFA_INVALID_CODE.String(), "totp_code is required")
+	}
+
+	if err := s.mfaSvc.ConfirmSetup(ctx, claims.Subject, req.GetTotpCode()); err != nil {
+		return nil, err
+	}
+
+	return &authv1.ConfirmTOTPResponse{}, nil
+}
+
+func (s *Service) ChallengeMFA(ctx context.Context, req *authv1.ChallengeMFARequest) (*authv1.ChallengeMFAResponse, error) {
+	// 1. Validate input.
+	if req.GetMfaSessionToken() == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_INVALID_MFA_SESSION.String(), "mfa_session_token is required")
+	}
+	if req.GetCode() == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_MFA_INVALID_CODE.String(), "code is required")
+	}
+
+	// 2. Consume the MFA session (single-use).
+	// If the token is invalid, expired, or already consumed, this returns an error.
+	sessionData, err := s.mfaSvc.ConsumeSession(ctx, req.GetMfaSessionToken())
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Validate the TOTP code against the user's enrolled secret.
+	if err := s.mfaSvc.ValidateCode(ctx, sessionData.UserID, req.GetCode()); err != nil {
+		// The MFA session is already consumed — the user must restart login.
+		// This prevents brute-forcing the TOTP code.
+		return nil, err
+	}
+
+	// 4. MFA passed — issue the full token pair.
+	tokens, _, err := s.createSessionAndTokens(ctx, sessionData.UserID, sessionData.Role, sessionData.ClientID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 5. Build response.
+	user, err := s.repo.FindByID(ctx, sessionData.UserID)
+	if err != nil {
+		return nil, merr.Internal(errReasonInternal, "failed to fetch user")
+	}
+
+	profile := userToProto(user)
+	profile.Scopes = s.resolveScopes(ctx, sessionData.ClientID)
+	profile.MfaEnabled = true
+
+	return &authv1.ChallengeMFAResponse{
+		User:   profile,
+		Tokens: tokens,
+	}, nil
+}
+
+func (s *Service) DisableMFA(ctx context.Context, req *authv1.DisableMFARequest) (*authv1.DisableMFAResponse, error) {
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 1. Require password re-confirmation for security.
+	if req.GetPassword() == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_INVALID_CREDENTIALS.String(), "password is required to disable MFA")
+	}
+
+	user, err := s.repo.FindByID(ctx, claims.Subject)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.PasswordHash == nil {
+		return nil, ErrInvalidCredentials
+	}
+	match, err := crypto.ComparePassword(req.GetPassword(), *user.PasswordHash)
+	if err != nil || !match {
+		return nil, ErrInvalidCredentials
+	}
+
+	// 2. Delete all MFA credentials.
+	if err := s.mfaSvc.DisableForUser(ctx, claims.Subject); err != nil {
+		return nil, merr.Internal(errReasonInternal, "failed to disable MFA")
+	}
+
+	return &authv1.DisableMFAResponse{}, nil
 }

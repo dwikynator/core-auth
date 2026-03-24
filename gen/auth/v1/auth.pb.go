@@ -3321,7 +3321,7 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\tOTPTarget\x12\x1a\n" +
 	"\x16OTP_TARGET_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10OTP_TARGET_EMAIL\x10\x01\x12\x14\n" +
-	"\x10OTP_TARGET_PHONE\x10\x022\xad\x17\n" +
+	"\x10OTP_TARGET_PHONE\x10\x022\xb8\x17\n" +
 	"\vAuthService\x12]\n" +
 	"\bRegister\x12\x18.auth.v1.RegisterRequest\x1a\x19.auth.v1.RegisterResponse\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/v1/auth/register\x12Q\n" +
 	"\x05Login\x12\x15.auth.v1.LoginRequest\x1a\x16.auth.v1.LoginResponse\"\x19\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/v1/auth/login\x12U\n" +
@@ -3337,9 +3337,9 @@ const file_auth_v1_auth_proto_rawDesc = "" +
 	"\rResetPassword\x12\x1d.auth.v1.ResetPasswordRequest\x1a\x1e.auth.v1.ResetPasswordResponse\"\"\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/auth/reset-password\x12f\n" +
 	"\tSetupTOTP\x12\x19.auth.v1.SetupTOTPRequest\x1a\x1a.auth.v1.SetupTOTPResponse\"\"\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/v1/auth/mfa/totp/setup\x12n\n" +
 	"\vConfirmTOTP\x12\x1b.auth.v1.ConfirmTOTPRequest\x1a\x1c.auth.v1.ConfirmTOTPResponse\"$\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/v1/auth/mfa/totp/confirm\x12n\n" +
-	"\fChallengeMFA\x12\x1c.auth.v1.ChallengeMFARequest\x1a\x1d.auth.v1.ChallengeMFAResponse\"!\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/v1/auth/mfa/challenge\x12[\n" +
+	"\fChallengeMFA\x12\x1c.auth.v1.ChallengeMFARequest\x1a\x1d.auth.v1.ChallengeMFAResponse\"!\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/v1/auth/mfa/challenge\x12f\n" +
 	"\n" +
-	"DisableMFA\x12\x1a.auth.v1.DisableMFARequest\x1a\x1b.auth.v1.DisableMFAResponse\"\x14\x82\xd3\xe4\x93\x02\x0e*\f/v1/auth/mfa\x12\x9d\x01\n" +
+	"DisableMFA\x12\x1a.auth.v1.DisableMFARequest\x1a\x1b.auth.v1.DisableMFAResponse\"\x1f\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/v1/auth/mfa/disable\x12\x9d\x01\n" +
 	"\x1bGetWhatsAppVerificationLink\x12+.auth.v1.GetWhatsAppVerificationLinkRequest\x1a,.auth.v1.GetWhatsAppVerificationLinkResponse\"#\x82\xd3\xe4\x93\x02\x1d:\x01*\"\x18/v1/auth/verify/whatsapp\x12f\n" +
 	"\fListSessions\x12\x1c.auth.v1.ListSessionsRequest\x1a\x1d.auth.v1.ListSessionsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/auth/sessions\x12v\n" +
 	"\rRevokeSession\x12\x1d.auth.v1.RevokeSessionRequest\x1a\x1e.auth.v1.RevokeSessionResponse\"&\x82\xd3\xe4\x93\x02 *\x1e/v1/auth/sessions/{session_id}\x12u\n" +

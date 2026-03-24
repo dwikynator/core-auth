@@ -239,7 +239,8 @@ service AuthService {
   //         UNAUTHENTICATED/invalid_credentials (password re-confirmation required)
   rpc DisableMFA(DisableMFARequest) returns (DisableMFAResponse) {
     option (google.api.http) = {
-      delete: "/v1/auth/mfa"
+      post: "/v1/auth/mfa/disable"
+      body: "*"
     };
   }
 

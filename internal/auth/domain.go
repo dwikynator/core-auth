@@ -47,6 +47,27 @@ type TenantConfig struct {
 	UpdatedAt       time.Time
 }
 
+// MFACredential represents a user's enrolled MFA factor (TOTP, WebAuthn, etc.).
+// The `Verified` flag indicates whether the user has completed enrollment by
+// validating at least one code. Unverified credentials do NOT block login.
+type MFACredential struct {
+	ID              string
+	UserID          string
+	Type            string // "totp" or "webauthn"
+	SecretEncrypted string
+	Verified        bool
+	CreatedAt       time.Time
+	LastUsedAt      *time.Time
+}
+
+// MFASessionData is the payload stored in Redis during the MFA login flow.
+// It bridges the gap between successful password verification and TOTP completion.
+type MFASessionData struct {
+	UserID   string `json:"user_id"`
+	ClientID string `json:"client_id"`
+	Role     string `json:"role"`
+}
+
 // UserRepository defines the persistence contract for user operations.
 // Implementations live in internal/auth/repository/.
 type UserRepository interface {
@@ -130,4 +151,40 @@ type TenantConfigRepository interface {
 	// FindByClientID returns the tenant config for the given client_id.
 	// Returns ErrTenantNotFound if no config exists for this client.
 	FindByClientID(ctx context.Context, clientID string) (*TenantConfig, error)
+}
+
+// MFACredentialRepository defines persistence operations for MFA credentials.
+type MFACredentialRepository interface {
+	// Create inserts a new MFA credential. Returns ErrMFAAlreadyEnrolled
+	// if a credential of the same type already exists for the user.
+	Create(ctx context.Context, cred *MFACredential) error
+
+	// FindVerifiedByUserID returns the active (verified) MFA credential for a user.
+	// Returns ErrMFANotEnrolled if no verified credential exists.
+	FindVerifiedByUserID(ctx context.Context, userID string) (*MFACredential, error)
+
+	// FindByUserID returns any MFA credential for a user (including unverified).
+	// Returns ErrMFANotEnrolled if no credential exists at all.
+	FindByUserID(ctx context.Context, userID string) (*MFACredential, error)
+
+	// MarkVerified sets verified = true and updates last_used_at.
+	MarkVerified(ctx context.Context, credID string) error
+
+	// UpdateLastUsed updates the last_used_at timestamp after a successful challenge.
+	UpdateLastUsed(ctx context.Context, credID string) error
+
+	// DeleteByUserID removes all MFA credentials for a user (used in DisableMFA).
+	DeleteByUserID(ctx context.Context, userID string) error
+}
+
+// MFASessionStore defines operations for the short-lived MFA login sessions.
+// Implementations should use Redis with a short TTL (e.g. 5 minutes).
+type MFASessionStore interface {
+	// Create stores an MFA session and returns the raw token.
+	// The token is a random 32-byte hex string. The store keys by SHA-256 hash.
+	Create(ctx context.Context, data *MFASessionData) (rawToken string, err error)
+
+	// Consume retrieves and immediately deletes the session (single-use).
+	// Returns ErrInvalidMFASession if the token is not found or already consumed.
+	Consume(ctx context.Context, rawToken string) (*MFASessionData, error)
 }

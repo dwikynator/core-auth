@@ -16,12 +16,15 @@ type Config struct {
 	RSAPrivateKeyPath string `env:"RSA_PRIVATE_KEY_PATH,required"`
 	JWTIssuer         string `env:"JWT_ISSUER,required"`
 
-	// Email & Verification ──
+	// Email & Verification
 	ResendAPIKey string `env:"RESEND_API_KEY,required"`
 	ResendFrom   string `env:"RESEND_FROM" envDefault:"onboarding@resend.dev"`
 	FrontendURL  string `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
 
 	BaseURL string `env:"BASE_URL" envDefault:"http://localhost:8080"`
+
+	// MFA
+	MFAEncryptionKey string `env:"MFA_ENCRYPTION_KEY,required"` // 32-byte hex-encoded AES-256 key
 }
 
 // Load reads .env (if present) and parses environment variables into Config.
