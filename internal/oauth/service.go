@@ -6,6 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/dwikynator/core-auth/internal/auth"
+	credentialdomain "github.com/dwikynator/core-auth/internal/credentials/domain"
+	identitydomain "github.com/dwikynator/core-auth/internal/identity/domain"
 )
 
 // OAuthService orchestrates the OAuth2 login flow.
@@ -13,9 +15,9 @@ import (
 type OAuthService struct {
 	providers    map[string]OAuthProvider
 	stateStore   StateStore
-	linkStore    auth.LinkSessionStore
-	userRepo     auth.UserRepository
-	providerRepo auth.UserProviderRepository
+	linkStore    credentialdomain.LinkSessionStore
+	userRepo     identitydomain.UserRepository
+	providerRepo credentialdomain.UserProviderRepository
 }
 
 // NewOAuthService creates a new OAuthService.
@@ -24,9 +26,9 @@ type OAuthService struct {
 // don't add the Google provider and the service will return "unsupported provider".
 func NewOAuthService(
 	stateStore StateStore,
-	linkStore auth.LinkSessionStore,
-	userRepo auth.UserRepository,
-	providerRepo auth.UserProviderRepository,
+	linkStore credentialdomain.LinkSessionStore,
+	userRepo identitydomain.UserRepository,
+	providerRepo credentialdomain.UserProviderRepository,
 	providers ...OAuthProvider,
 ) *OAuthService {
 	pm := make(map[string]OAuthProvider, len(providers))
@@ -81,7 +83,7 @@ func (s *OAuthService) GenerateAuthURL(ctx context.Context, providerName, client
 //  3. Check if this social identity is already linked → returning user.
 //  4. Check if the email matches an existing account → needs linking.
 //  5. Otherwise → create a new user and link the provider.
-func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, state string) (*auth.OAuthCallbackResult, error) {
+func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, state string) (*credentialdomain.OAuthCallbackResult, error) {
 	// 1. Validate and consume the state token.
 	clientID, err := s.stateStore.Consume(ctx, state)
 	if err != nil {
@@ -109,7 +111,7 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 			return nil, fmt.Errorf("fetch linked user: %w", err)
 		}
 
-		return &auth.OAuthCallbackResult{
+		return &credentialdomain.OAuthCallbackResult{
 			IsExistingLink: true,
 			User:           user,
 			ProviderEmail:  userInfo.Email,
@@ -125,7 +127,7 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 		existingUser, err := s.userRepo.FindByEmail(ctx, userInfo.Email)
 		if err == nil {
 			// Email clash — the user needs to prove they own the existing account.
-			return &auth.OAuthCallbackResult{
+			return &credentialdomain.OAuthCallbackResult{
 				NeedsLinking:   true,
 				ProviderEmail:  userInfo.Email,
 				ProviderUserID: userInfo.ProviderUserID,
@@ -139,7 +141,7 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 	}
 
 	// 5. No existing user — create a new account and link the provider.
-	newUser := &auth.User{
+	newUser := &identitydomain.User{
 		Email:  &userInfo.Email,
 		Role:   "user",
 		Status: "active", // Social logins bypass email verification — the provider verified it.
@@ -166,7 +168,7 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 	}
 
 	// Link the provider to the new user.
-	up := &auth.UserProvider{
+	up := &credentialdomain.UserProvider{
 		UserID:         newUser.ID,
 		Provider:       providerName,
 		ProviderUserID: userInfo.ProviderUserID,
@@ -184,7 +186,7 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 		return nil, fmt.Errorf("re-fetch new user: %w", err)
 	}
 
-	return &auth.OAuthCallbackResult{
+	return &credentialdomain.OAuthCallbackResult{
 		IsNewUser:     true,
 		User:          newUser,
 		ProviderEmail: userInfo.Email,
@@ -193,12 +195,12 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 
 // CreateLinkSession stores a link session and returns the raw token.
 // Implements auth.OAuthSvc.
-func (s *OAuthService) CreateLinkSession(ctx context.Context, data *auth.LinkSessionData) (string, error) {
+func (s *OAuthService) CreateLinkSession(ctx context.Context, data *credentialdomain.LinkSessionData) (string, error) {
 	return s.linkStore.Create(ctx, data)
 }
 
 // ConsumeLinkSession retrieves and atomically deletes a link session.
 // Implements auth.OAuthSvc.
-func (s *OAuthService) ConsumeLinkSession(ctx context.Context, rawToken string) (*auth.LinkSessionData, error) {
+func (s *OAuthService) ConsumeLinkSession(ctx context.Context, rawToken string) (*credentialdomain.LinkSessionData, error) {
 	return s.linkStore.Consume(ctx, rawToken)
 }

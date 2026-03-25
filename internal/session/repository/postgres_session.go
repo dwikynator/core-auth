@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/dwikynator/core-auth/internal/auth"
+	domain "github.com/dwikynator/core-auth/internal/session/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -14,11 +15,11 @@ type postgresSessionRepo struct {
 }
 
 // NewPostgresSessionRepo returns a SessionRepository backed by pgx.
-func NewPostgresSessionRepo(db *pgxpool.Pool) auth.SessionRepository {
+func NewPostgresSessionRepo(db *pgxpool.Pool) domain.SessionRepository {
 	return &postgresSessionRepo{db: db}
 }
 
-func (r *postgresSessionRepo) Create(ctx context.Context, s *auth.Session) error {
+func (r *postgresSessionRepo) Create(ctx context.Context, s *domain.Session) error {
 	const query = `
 		INSERT INTO sessions (user_id, client_id, refresh_token_hash, ip_address, user_agent, expires_at)
 		VALUES ($1, $2, $3, $4::inet, $5, $6)
@@ -35,7 +36,7 @@ func (r *postgresSessionRepo) Create(ctx context.Context, s *auth.Session) error
 	).Scan(&s.ID, &s.CreatedAt, &s.LastUsedAt)
 }
 
-func (r *postgresSessionRepo) FindByRefreshTokenHash(ctx context.Context, hash string) (*auth.Session, error) {
+func (r *postgresSessionRepo) FindByRefreshTokenHash(ctx context.Context, hash string) (*domain.Session, error) {
 	const query = `
 		SELECT id, user_id, client_id, refresh_token_hash,
 		       ip_address::text, user_agent, expires_at, revoked_at,
@@ -45,7 +46,7 @@ func (r *postgresSessionRepo) FindByRefreshTokenHash(ctx context.Context, hash s
 		  AND  revoked_at IS NULL
 	`
 
-	s := &auth.Session{}
+	s := &domain.Session{}
 	err := r.db.QueryRow(ctx, query, hash).Scan(
 		&s.ID,
 		&s.UserID,
@@ -135,7 +136,7 @@ func (r *postgresSessionRepo) RevokeAllForUser(ctx context.Context, userID strin
 	return int(tag.RowsAffected()), nil
 }
 
-func (r *postgresSessionRepo) ListActiveByUser(ctx context.Context, userID string) ([]*auth.Session, error) {
+func (r *postgresSessionRepo) ListActiveByUser(ctx context.Context, userID string) ([]*domain.Session, error) {
 	const query = `
 		SELECT id, user_id, client_id, refresh_token_hash,
 		       ip_address::text, user_agent, expires_at, revoked_at,
@@ -153,9 +154,9 @@ func (r *postgresSessionRepo) ListActiveByUser(ctx context.Context, userID strin
 	}
 	defer rows.Close()
 
-	var sessions []*auth.Session
+	var sessions []*domain.Session
 	for rows.Next() {
-		s := &auth.Session{}
+		s := &domain.Session{}
 		if err := rows.Scan(
 			&s.ID,
 			&s.UserID,

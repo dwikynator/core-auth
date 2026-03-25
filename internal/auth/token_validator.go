@@ -7,6 +7,7 @@ import (
 
 	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
+	sessiondomain "github.com/dwikynator/core-auth/internal/session/domain"
 	"github.com/dwikynator/minato/merr"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -15,7 +16,7 @@ import (
 // It is constructed once at startup and safe for concurrent use — both fields
 // are immutable after NewTokenValidator returns.
 type TokenValidator struct {
-	blacklistRepo TokenBlacklistRepository
+	blacklistRepo sessiondomain.TokenBlacklistRepository
 	parser        *jwt.Parser
 	keyFunc       jwt.Keyfunc
 }
@@ -23,7 +24,7 @@ type TokenValidator struct {
 // NewTokenValidator constructs a TokenValidator.
 // The jwt.Parser is built once here — allocating it per-request would add
 // unnecessary heap pressure on every authenticated call.
-func NewTokenValidator(publicKey *rsa.PublicKey, issuer string, blacklistRepo TokenBlacklistRepository) *TokenValidator {
+func NewTokenValidator(publicKey *rsa.PublicKey, issuer string, blacklistRepo sessiondomain.TokenBlacklistRepository) *TokenValidator {
 	parser := jwt.NewParser(
 		jwt.WithValidMethods([]string{"RS256"}),
 		jwt.WithIssuer(issuer),

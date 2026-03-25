@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/dwikynator/core-auth/internal/auth"
+	domain "github.com/dwikynator/core-auth/internal/identity/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,11 +19,11 @@ type postgresUserRepo struct {
 }
 
 // NewPostgresUserRepo returns a UserRepository backed by pgx.
-func NewPostgresUserRepo(db *pgxpool.Pool) auth.UserRepository {
+func NewPostgresUserRepo(db *pgxpool.Pool) domain.UserRepository {
 	return &postgresUserRepo{db: db}
 }
 
-func (r *postgresUserRepo) Create(ctx context.Context, u *auth.User) error {
+func (r *postgresUserRepo) Create(ctx context.Context, u *domain.User) error {
 	const query = `
 		INSERT INTO users (email, username, phone, password_hash, role, status)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -48,7 +49,7 @@ func (r *postgresUserRepo) Create(ctx context.Context, u *auth.User) error {
 	return nil
 }
 
-func (r *postgresUserRepo) FindByLogin(ctx context.Context, identifier string) (*auth.User, error) {
+func (r *postgresUserRepo) FindByLogin(ctx context.Context, identifier string) (*domain.User, error) {
 	const query = `
 		SELECT id, email, username, phone, password_hash,
 		       role, status, email_verified_at, phone_verified_at,
@@ -59,7 +60,7 @@ func (r *postgresUserRepo) FindByLogin(ctx context.Context, identifier string) (
 		LIMIT  1
 	`
 
-	u := &auth.User{}
+	u := &domain.User{}
 	err := r.db.QueryRow(ctx, query, identifier).Scan(
 		&u.ID,
 		&u.Email,
@@ -82,7 +83,7 @@ func (r *postgresUserRepo) FindByLogin(ctx context.Context, identifier string) (
 	return u, nil
 }
 
-func (r *postgresUserRepo) FindByID(ctx context.Context, userID string) (*auth.User, error) {
+func (r *postgresUserRepo) FindByID(ctx context.Context, userID string) (*domain.User, error) {
 	const query = `
 		SELECT id, email, username, phone, password_hash,
 		       role, status, email_verified_at, phone_verified_at,
@@ -92,7 +93,7 @@ func (r *postgresUserRepo) FindByID(ctx context.Context, userID string) (*auth.U
 		  AND  deleted_at IS NULL
 	`
 
-	u := &auth.User{}
+	u := &domain.User{}
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&u.ID,
 		&u.Email,
@@ -115,7 +116,7 @@ func (r *postgresUserRepo) FindByID(ctx context.Context, userID string) (*auth.U
 	return u, nil
 }
 
-func (r *postgresUserRepo) FindByEmail(ctx context.Context, email string) (*auth.User, error) {
+func (r *postgresUserRepo) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	const query = `
 		SELECT id, email, username, phone, password_hash,
 		       role, status, email_verified_at, phone_verified_at,
@@ -125,7 +126,7 @@ func (r *postgresUserRepo) FindByEmail(ctx context.Context, email string) (*auth
 		  AND  deleted_at IS NULL
 	`
 
-	u := &auth.User{}
+	u := &domain.User{}
 	err := r.db.QueryRow(ctx, query, email).Scan(
 		&u.ID,
 		&u.Email,

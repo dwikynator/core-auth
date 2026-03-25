@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dwikynator/core-auth/internal/auth"
+	domain "github.com/dwikynator/core-auth/internal/credentials/domain"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -23,7 +24,7 @@ type redisLinkSessionStore struct {
 }
 
 // NewRedisLinkSessionStore returns a LinkSessionStore backed by Redis.
-func NewRedisLinkSessionStore(rdb *redis.Client) auth.LinkSessionStore {
+func NewRedisLinkSessionStore(rdb *redis.Client) domain.LinkSessionStore {
 	return &redisLinkSessionStore{rdb: rdb}
 }
 func linkSessionKey(hash string) string {
@@ -32,7 +33,7 @@ func linkSessionKey(hash string) string {
 
 // Create generates a random token, stores the session data under its SHA-256 hash, and
 // returns the raw token to the caller. Mirrors the MFA session store pattern exactly.
-func (s *redisLinkSessionStore) Create(ctx context.Context, data *auth.LinkSessionData) (string, error) {
+func (s *redisLinkSessionStore) Create(ctx context.Context, data *domain.LinkSessionData) (string, error) {
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return "", fmt.Errorf("generate link session token: %w", err)
@@ -53,7 +54,7 @@ func (s *redisLinkSessionStore) Create(ctx context.Context, data *auth.LinkSessi
 // Consume retrieves and deletes the session atomically (single-use) using a Redis pipeline.
 // A pipeline GET + DEL is used instead of GETDEL because it allows inspecting the
 // GET result before the pipeline commits; both commands execute atomically on the server.
-func (s *redisLinkSessionStore) Consume(ctx context.Context, rawToken string) (*auth.LinkSessionData, error) {
+func (s *redisLinkSessionStore) Consume(ctx context.Context, rawToken string) (*domain.LinkSessionData, error) {
 	hash := sha256.Sum256([]byte(rawToken))
 	hashHex := hex.EncodeToString(hash[:])
 	key := linkSessionKey(hashHex)
@@ -70,7 +71,7 @@ func (s *redisLinkSessionStore) Consume(ctx context.Context, rawToken string) (*
 		}
 		return nil, auth.ErrLinkSessionExpired
 	}
-	var data auth.LinkSessionData
+	var data domain.LinkSessionData
 	if err := json.Unmarshal(payload, &data); err != nil {
 		return nil, fmt.Errorf("unmarshal link session: %w", err)
 	}

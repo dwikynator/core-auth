@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dwikynator/core-auth/internal/auth"
+	domain "github.com/dwikynator/core-auth/internal/session/domain"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -15,7 +15,7 @@ type redisBlacklist struct {
 }
 
 // NewRedisBlacklist creates a new Redis-backed token blacklist.
-func NewRedisBlacklist(client *redis.Client) auth.TokenBlacklistRepository {
+func NewRedisBlacklist(client *redis.Client) domain.TokenBlacklistRepository {
 	return &redisBlacklist{client: client}
 }
 

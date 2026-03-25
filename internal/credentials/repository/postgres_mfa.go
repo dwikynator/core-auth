@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/dwikynator/core-auth/internal/auth"
+	domain "github.com/dwikynator/core-auth/internal/credentials/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,11 +16,11 @@ type postgresMFARepo struct {
 }
 
 // NewPostgresMFARepo returns an MFACredentialRepository backed by pgx.
-func NewPostgresMFARepo(db *pgxpool.Pool) auth.MFACredentialRepository {
+func NewPostgresMFARepo(db *pgxpool.Pool) domain.MFACredentialRepository {
 	return &postgresMFARepo{db: db}
 }
 
-func (r *postgresMFARepo) Create(ctx context.Context, cred *auth.MFACredential) error {
+func (r *postgresMFARepo) Create(ctx context.Context, cred *domain.MFACredential) error {
 	const query = `
 		INSERT INTO mfa_credentials (user_id, type, secret_encrypted)
 		VALUES ($1, $2, $3)
@@ -43,7 +44,7 @@ func (r *postgresMFARepo) Create(ctx context.Context, cred *auth.MFACredential) 
 	return nil
 }
 
-func (r *postgresMFARepo) FindVerifiedByUserID(ctx context.Context, userID string) (*auth.MFACredential, error) {
+func (r *postgresMFARepo) FindVerifiedByUserID(ctx context.Context, userID string) (*domain.MFACredential, error) {
 	const query = `
 		SELECT id, user_id, type, secret_encrypted, verified, created_at, last_used_at
 		FROM   mfa_credentials
@@ -52,7 +53,7 @@ func (r *postgresMFARepo) FindVerifiedByUserID(ctx context.Context, userID strin
 		LIMIT  1
 	`
 
-	cred := &auth.MFACredential{}
+	cred := &domain.MFACredential{}
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&cred.ID,
 		&cred.UserID,
@@ -71,7 +72,7 @@ func (r *postgresMFARepo) FindVerifiedByUserID(ctx context.Context, userID strin
 	return cred, nil
 }
 
-func (r *postgresMFARepo) FindByUserID(ctx context.Context, userID string) (*auth.MFACredential, error) {
+func (r *postgresMFARepo) FindByUserID(ctx context.Context, userID string) (*domain.MFACredential, error) {
 	const query = `
 		SELECT id, user_id, type, secret_encrypted, verified, created_at, last_used_at
 		FROM   mfa_credentials
@@ -79,7 +80,7 @@ func (r *postgresMFARepo) FindByUserID(ctx context.Context, userID string) (*aut
 		LIMIT  1
 	`
 
-	cred := &auth.MFACredential{}
+	cred := &domain.MFACredential{}
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&cred.ID,
 		&cred.UserID,

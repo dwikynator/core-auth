@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/dwikynator/core-auth/internal/auth"
+	domain "github.com/dwikynator/core-auth/internal/credentials/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,7 +16,7 @@ type postgresUserProviderRepo struct {
 }
 
 // NewPostgresUserProviderRepo creates a new UserProviderRepository backed by Postgres.
-func NewPostgresUserProviderRepo(db *pgxpool.Pool) auth.UserProviderRepository {
+func NewPostgresUserProviderRepo(db *pgxpool.Pool) domain.UserProviderRepository {
 	return &postgresUserProviderRepo{db: db}
 }
 
@@ -24,7 +25,7 @@ func isDuplicateKeyError(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
-func (r *postgresUserProviderRepo) Create(ctx context.Context, up *auth.UserProvider) error {
+func (r *postgresUserProviderRepo) Create(ctx context.Context, up *domain.UserProvider) error {
 	const query = `
 		INSERT INTO user_providers (user_id, provider, provider_user_id, provider_email)
 		VALUES ($1, $2, $3, $4)
@@ -47,14 +48,14 @@ func (r *postgresUserProviderRepo) Create(ctx context.Context, up *auth.UserProv
 	return nil
 }
 
-func (r *postgresUserProviderRepo) FindByProviderAndSubject(ctx context.Context, provider, providerUserID string) (*auth.UserProvider, error) {
+func (r *postgresUserProviderRepo) FindByProviderAndSubject(ctx context.Context, provider, providerUserID string) (*domain.UserProvider, error) {
 	const query = `
 		SELECT id, user_id, provider, provider_user_id, provider_email, created_at
 		FROM   user_providers
 		WHERE  provider = $1 AND provider_user_id = $2
 	`
 
-	up := &auth.UserProvider{}
+	up := &domain.UserProvider{}
 	err := r.db.QueryRow(ctx, query, provider, providerUserID).Scan(
 		&up.ID,
 		&up.UserID,
@@ -72,7 +73,7 @@ func (r *postgresUserProviderRepo) FindByProviderAndSubject(ctx context.Context,
 	return up, nil
 }
 
-func (r *postgresUserProviderRepo) FindByUserID(ctx context.Context, userID string) ([]*auth.UserProvider, error) {
+func (r *postgresUserProviderRepo) FindByUserID(ctx context.Context, userID string) ([]*domain.UserProvider, error) {
 	const query = `
 		SELECT id, user_id, provider, provider_user_id, provider_email, created_at
 		FROM   user_providers
@@ -86,9 +87,9 @@ func (r *postgresUserProviderRepo) FindByUserID(ctx context.Context, userID stri
 	}
 	defer rows.Close()
 
-	var providers []*auth.UserProvider
+	var providers []*domain.UserProvider
 	for rows.Next() {
-		up := &auth.UserProvider{}
+		up := &domain.UserProvider{}
 		if err := rows.Scan(
 			&up.ID,
 			&up.UserID,

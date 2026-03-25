@@ -18,6 +18,10 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	credentialdomain "github.com/dwikynator/core-auth/internal/credentials/domain"
+	identitydomain "github.com/dwikynator/core-auth/internal/identity/domain"
+	sessiondomain "github.com/dwikynator/core-auth/internal/session/domain"
 )
 
 // DefaultScopes are assigned when no tenant-specific scopes are configured.
@@ -33,32 +37,32 @@ type requestMeta struct {
 // Service implements authv1.AuthServiceServer.
 type Service struct {
 	authv1.UnimplementedAuthServiceServer
-	repo             UserRepository
+	repo             identitydomain.UserRepository
 	tokenSvc         *TokenService
 	verificationSvc  *verification.Service
-	blacklistRepo    TokenBlacklistRepository
-	sessionRepo      SessionRepository
-	tenantConfigRepo TenantConfigRepository
-	providerRepo     UserProviderRepository
+	blacklistRepo    sessiondomain.TokenBlacklistRepository
+	sessionRepo      sessiondomain.SessionRepository
+	tenantConfigRepo identitydomain.TenantConfigRepository
+	providerRepo     credentialdomain.UserProviderRepository
 	mfaSvc           *MFAService
 	whatsappPhone    string // E.164 WhatsApp Business phone number
 	auditLogger      *audit.Logger
-	oauthSvc         OAuthSvc
+	oauthSvc         credentialdomain.OAuthSvc
 }
 
 // NewService constructs an auth service with the given repository.
 func NewService(
-	repo UserRepository,
+	repo identitydomain.UserRepository,
 	tokenSvc *TokenService,
 	verificationSvc *verification.Service,
-	blacklistRepo TokenBlacklistRepository,
-	sessionRepo SessionRepository,
-	tenantConfigRepo TenantConfigRepository,
-	providerRepo UserProviderRepository,
+	blacklistRepo sessiondomain.TokenBlacklistRepository,
+	sessionRepo sessiondomain.SessionRepository,
+	tenantConfigRepo identitydomain.TenantConfigRepository,
+	providerRepo credentialdomain.UserProviderRepository,
 	mfaSvc *MFAService,
 	whatsappPhone string,
 	auditLogger *audit.Logger,
-	oauthSvc OAuthSvc,
+	oauthSvc credentialdomain.OAuthSvc,
 ) *Service {
 	return &Service{
 		repo:             repo,
@@ -98,7 +102,7 @@ func (s *Service) Register(ctx context.Context, req *authv1.RegisterRequest) (*a
 	}
 
 	// 2. Validate & normalise each provided identifier.
-	user := &User{
+	user := &identitydomain.User{
 		Role:   "user",
 		Status: "unverified",
 	}
@@ -208,7 +212,7 @@ func (s *Service) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.
 	// 5. Check if MFA is enrolled.
 	if s.mfaSvc.IsEnrolled(ctx, user.ID) {
 		// MFA is active — create a short-lived MFA session instead of issuing tokens.
-		mfaToken, err := s.mfaSvc.CreateSession(ctx, &MFASessionData{
+		mfaToken, err := s.mfaSvc.CreateSession(ctx, &credentialdomain.MFASessionData{
 			UserID:   user.ID,
 			ClientID: req.GetClientId(),
 			Role:     user.Role,
@@ -251,7 +255,7 @@ func (s *Service) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.
 }
 
 // Helpers
-func userToProto(u *User) *authv1.UserProfile {
+func userToProto(u *identitydomain.User) *authv1.UserProfile {
 	p := &authv1.UserProfile{
 		UserId: u.ID,
 		Role:   u.Role,
@@ -694,7 +698,7 @@ func (s *Service) createSessionAndTokens(ctx context.Context, userID, role, clie
 	meta := metaFromContext(ctx)
 
 	// 4. Persist the session.
-	session := &Session{
+	session := &sessiondomain.Session{
 		UserID:           userID,
 		ClientID:         clientID,
 		RefreshTokenHash: result.RefreshTokenHash,
@@ -1246,7 +1250,7 @@ func (s *Service) OAuthCallback(ctx context.Context, req *authv1.OAuthCallbackRe
 	if result.NeedsLinking {
 		// Create a short-lived link session so the client can complete the merge
 		// without restarting the OAuth2 flow from scratch.
-		linkToken, err := s.oauthSvc.CreateLinkSession(ctx, &LinkSessionData{
+		linkToken, err := s.oauthSvc.CreateLinkSession(ctx, &credentialdomain.LinkSessionData{
 			Provider:       providerName,
 			ProviderUserID: result.ProviderUserID,
 			ProviderEmail:  result.ProviderEmail,
@@ -1292,7 +1296,7 @@ func (s *Service) OAuthCallback(ctx context.Context, req *authv1.OAuthCallbackRe
 	// Check if MFA is enrolled.
 	if s.mfaSvc.IsEnrolled(ctx, user.ID) {
 		// MFA is active — create a short-lived MFA session instead of issuing tokens.
-		mfaToken, err := s.mfaSvc.CreateSession(ctx, &MFASessionData{
+		mfaToken, err := s.mfaSvc.CreateSession(ctx, &credentialdomain.MFASessionData{
 			UserID:   user.ID,
 			ClientID: req.GetClientId(),
 			Role:     user.Role,
@@ -1375,7 +1379,7 @@ func (s *Service) LinkProvider(ctx context.Context, req *authv1.LinkProviderRequ
 		return nil, ErrAccountDeleted
 	}
 	// 5. Create the provider link.
-	up := &UserProvider{
+	up := &credentialdomain.UserProvider{
 		UserID:         user.ID,
 		Provider:       session.Provider,
 		ProviderUserID: session.ProviderUserID,

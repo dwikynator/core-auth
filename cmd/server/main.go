@@ -9,8 +9,9 @@ import (
 
 	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
 	"github.com/dwikynator/core-auth/internal/auth"
-	authrepo "github.com/dwikynator/core-auth/internal/auth/repository"
 	"github.com/dwikynator/core-auth/internal/config"
+	credrepo "github.com/dwikynator/core-auth/internal/credentials/repository"
+	identityrepo "github.com/dwikynator/core-auth/internal/identity/repository"
 	"github.com/dwikynator/core-auth/internal/infrastructure/audit"
 	"github.com/dwikynator/core-auth/internal/infrastructure/database"
 	internalredis "github.com/dwikynator/core-auth/internal/infrastructure/redis"
@@ -18,6 +19,7 @@ import (
 	"github.com/dwikynator/core-auth/internal/libs/email"
 	"github.com/dwikynator/core-auth/internal/oauth"
 	oauthrepo "github.com/dwikynator/core-auth/internal/oauth/repository"
+	sessionrepo "github.com/dwikynator/core-auth/internal/session/repository"
 	"github.com/dwikynator/core-auth/internal/verification"
 	verificationrepo "github.com/dwikynator/core-auth/internal/verification/repository"
 
@@ -76,13 +78,13 @@ func run() error {
 	slog.Info("email client ready", "from", cfg.ResendFrom)
 
 	// 6. Initialize domain services
-	userRepo := authrepo.NewPostgresUserRepo(db)
+	userRepo := identityrepo.NewPostgresUserRepo(db)
 	verificationRepo := verificationrepo.NewPostgresVerificationRepo(db)
-	blacklistRepo := authrepo.NewRedisBlacklist(rdb)
-	sessionRepo := authrepo.NewPostgresSessionRepo(db)
-	tenantConfigRepo := authrepo.NewPostgresTenantConfigRepo(db)
-	mfaCredRepo := authrepo.NewPostgresMFARepo(db)
-	mfaSessionStore := authrepo.NewRedisMFASessionStore(rdb)
+	blacklistRepo := sessionrepo.NewRedisBlacklist(rdb)
+	sessionRepo := sessionrepo.NewPostgresSessionRepo(db)
+	tenantConfigRepo := identityrepo.NewPostgresTenantConfigRepo(db)
+	mfaCredRepo := credrepo.NewPostgresMFARepo(db)
+	mfaSessionStore := credrepo.NewRedisMFASessionStore(rdb)
 
 	// Parse the MFA encryption key from hex.
 	mfaKey, err := hex.DecodeString(cfg.MFAEncryptionKey)
@@ -98,9 +100,9 @@ func run() error {
 	auditLogger := audit.NewLogger(slog.Default())
 
 	// 6b. Initialize OAuth2 infrastructure
-	userProviderRepo := authrepo.NewPostgresUserProviderRepo(db)
+	userProviderRepo := credrepo.NewPostgresUserProviderRepo(db)
 	oauthStateStore := oauthrepo.NewRedisStateStore(rdb)
-	linkSessionStore := authrepo.NewRedisLinkSessionStore(rdb)
+	linkSessionStore := credrepo.NewRedisLinkSessionStore(rdb)
 
 	var oauthProviders []oauth.OAuthProvider
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {

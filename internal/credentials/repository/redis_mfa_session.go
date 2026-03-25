@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dwikynator/core-auth/internal/auth"
+	domain "github.com/dwikynator/core-auth/internal/credentials/domain"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -23,7 +24,7 @@ type redisMFASessionStore struct {
 }
 
 // NewRedisMFASessionStore returns an MFASessionStore backed by Redis.
-func NewRedisMFASessionStore(rdb *redis.Client) auth.MFASessionStore {
+func NewRedisMFASessionStore(rdb *redis.Client) domain.MFASessionStore {
 	return &redisMFASessionStore{rdb: rdb}
 }
 
@@ -32,7 +33,7 @@ func redisKey(hash string) string {
 	return "mfa:session:" + hash
 }
 
-func (s *redisMFASessionStore) Create(ctx context.Context, data *auth.MFASessionData) (string, error) {
+func (s *redisMFASessionStore) Create(ctx context.Context, data *domain.MFASessionData) (string, error) {
 	// 1. Generate a cryptographically random token (32 bytes → 64-char hex).
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -58,7 +59,7 @@ func (s *redisMFASessionStore) Create(ctx context.Context, data *auth.MFASession
 	return rawToken, nil
 }
 
-func (s *redisMFASessionStore) Consume(ctx context.Context, rawToken string) (*auth.MFASessionData, error) {
+func (s *redisMFASessionStore) Consume(ctx context.Context, rawToken string) (*domain.MFASessionData, error) {
 	// 1. Hash the incoming token to find the Redis key.
 	hash := sha256.Sum256([]byte(rawToken))
 	hashHex := hex.EncodeToString(hash[:])
@@ -84,7 +85,7 @@ func (s *redisMFASessionStore) Consume(ctx context.Context, rawToken string) (*a
 	}
 
 	// 3. Deserialize.
-	var data auth.MFASessionData
+	var data domain.MFASessionData
 	if err := json.Unmarshal(payload, &data); err != nil {
 		return nil, fmt.Errorf("unmarshal mfa session: %w", err)
 	}

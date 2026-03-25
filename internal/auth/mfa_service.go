@@ -9,14 +9,15 @@ import (
 	"fmt"
 	"io"
 
+	credentialdomain "github.com/dwikynator/core-auth/internal/credentials/domain"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
 )
 
 // MFAService handles TOTP enrollment, validation, and credential management.
 type MFAService struct {
-	credRepo     MFACredentialRepository
-	sessionStore MFASessionStore
+	credRepo     credentialdomain.MFACredentialRepository
+	sessionStore credentialdomain.MFASessionStore
 	aesKey       []byte // 32-byte AES-256 key for encrypting TOTP secrets
 	issuerName   string // display name in authenticator apps (e.g. "core-auth")
 }
@@ -24,8 +25,8 @@ type MFAService struct {
 // NewMFAService constructs an MFAService.
 // encryptionKey must be exactly 32 bytes (AES-256).
 func NewMFAService(
-	credRepo MFACredentialRepository,
-	sessionStore MFASessionStore,
+	credRepo credentialdomain.MFACredentialRepository,
+	sessionStore credentialdomain.MFASessionStore,
 	encryptionKey []byte,
 	issuerName string,
 ) *MFAService {
@@ -75,7 +76,7 @@ func (m *MFAService) Setup(ctx context.Context, userID, userEmail string) (*Setu
 	}
 
 	// 4. Persist.
-	cred := &MFACredential{
+	cred := &credentialdomain.MFACredential{
 		UserID:          userID,
 		Type:            "totp",
 		SecretEncrypted: encrypted,
@@ -149,12 +150,12 @@ func (m *MFAService) IsEnrolled(ctx context.Context, userID string) bool {
 }
 
 // CreateSession generates an MFA session token and stores it in Redis.
-func (m *MFAService) CreateSession(ctx context.Context, data *MFASessionData) (string, error) {
+func (m *MFAService) CreateSession(ctx context.Context, data *credentialdomain.MFASessionData) (string, error) {
 	return m.sessionStore.Create(ctx, data)
 }
 
 // ConsumeSession retrieves and deletes an MFA session (single-use).
-func (m *MFAService) ConsumeSession(ctx context.Context, rawToken string) (*MFASessionData, error) {
+func (m *MFAService) ConsumeSession(ctx context.Context, rawToken string) (*credentialdomain.MFASessionData, error) {
 	return m.sessionStore.Consume(ctx, rawToken)
 }
 

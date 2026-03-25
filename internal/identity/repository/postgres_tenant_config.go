@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dwikynator/core-auth/internal/auth"
+	domain "github.com/dwikynator/core-auth/internal/identity/domain"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -16,7 +17,7 @@ import (
 const cacheTTL = 5 * time.Minute
 
 type cachedConfig struct {
-	config    *auth.TenantConfig
+	config    *domain.TenantConfig
 	fetchedAt time.Time
 }
 
@@ -28,14 +29,14 @@ type postgresTenantConfigRepo struct {
 
 // NewPostgresTenantConfigRepo returns a TenantConfigRepository backed by pgx
 // with an in-memory cache. Cache entries expire after 5 minutes.
-func NewPostgresTenantConfigRepo(db *pgxpool.Pool) auth.TenantConfigRepository {
+func NewPostgresTenantConfigRepo(db *pgxpool.Pool) domain.TenantConfigRepository {
 	return &postgresTenantConfigRepo{
 		db:    db,
 		cache: make(map[string]cachedConfig),
 	}
 }
 
-func (r *postgresTenantConfigRepo) FindByClientID(ctx context.Context, clientID string) (*auth.TenantConfig, error) {
+func (r *postgresTenantConfigRepo) FindByClientID(ctx context.Context, clientID string) (*domain.TenantConfig, error) {
 	// 1. Check the cache first (hot path).
 	r.mu.RLock()
 	if entry, ok := r.cache[clientID]; ok && time.Since(entry.fetchedAt) < cacheTTL {
@@ -56,7 +57,7 @@ func (r *postgresTenantConfigRepo) FindByClientID(ctx context.Context, clientID 
 	`
 
 	var accessSecs, refreshSecs int64
-	tc := &auth.TenantConfig{}
+	tc := &domain.TenantConfig{}
 	err := r.db.QueryRow(ctx, query, clientID).Scan(
 		&tc.ClientID,
 		&accessSecs,
