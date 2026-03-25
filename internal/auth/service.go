@@ -10,9 +10,9 @@ import (
 	"time"
 
 	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
-	"github.com/dwikynator/core-auth/internal/audit"
-	"github.com/dwikynator/core-auth/internal/crypto"
-	"github.com/dwikynator/core-auth/internal/validate"
+	"github.com/dwikynator/core-auth/internal/infrastructure/audit"
+	"github.com/dwikynator/core-auth/internal/libs/crypto"
+	"github.com/dwikynator/core-auth/internal/libs/validate"
 	"github.com/dwikynator/core-auth/internal/verification"
 	"github.com/dwikynator/minato/merr"
 	"google.golang.org/grpc/metadata"

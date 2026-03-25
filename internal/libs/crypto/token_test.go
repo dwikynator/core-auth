@@ -3,7 +3,7 @@ package crypto_test
 import (
 	"testing"
 
-	"github.com/dwikynator/core-auth/internal/crypto"
+	"github.com/dwikynator/core-auth/internal/libs/crypto"
 )
 
 func TestGenerateOTP(t *testing.T) {

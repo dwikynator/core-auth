@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
-	"github.com/dwikynator/core-auth/internal/crypto"
+	"github.com/dwikynator/core-auth/internal/libs/crypto"
 	"github.com/dwikynator/minato/merr"
 	"github.com/golang-jwt/jwt/v5"
 )

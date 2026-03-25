@@ -7,7 +7,7 @@ import (
 	"time"
 
 	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
-	"github.com/dwikynator/core-auth/internal/crypto"
+	"github.com/dwikynator/core-auth/internal/libs/crypto"
 )
 
 // Default token lifetimes. These will become per-tenant configurable in Phase 3C.

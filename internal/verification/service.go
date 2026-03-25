@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/dwikynator/core-auth/internal/crypto"
-	"github.com/dwikynator/core-auth/internal/email"
+	"github.com/dwikynator/core-auth/internal/libs/crypto"
+	"github.com/dwikynator/core-auth/internal/libs/email"
 )
 
 // Default token lifetimes.
