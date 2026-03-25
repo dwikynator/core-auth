@@ -103,3 +103,26 @@ func (r *postgresUserProviderRepo) FindByUserID(ctx context.Context, userID stri
 	}
 	return providers, rows.Err()
 }
+
+func (r *postgresUserProviderRepo) Delete(ctx context.Context, userID, provider string) error {
+	const query = `
+		DELETE FROM user_providers
+		WHERE user_id = $1 AND provider = $2
+	`
+	tag, err := r.db.Exec(ctx, query, userID, provider)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return auth.ErrProviderNotLinked
+	}
+	return nil
+}
+func (r *postgresUserProviderRepo) CountByUserID(ctx context.Context, userID string) (int, error) {
+	const query = `SELECT COUNT(*) FROM user_providers WHERE user_id = $1`
+	var count int
+	if err := r.db.QueryRow(ctx, query, userID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}

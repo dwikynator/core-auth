@@ -32,6 +32,8 @@ const (
 	EventOAuthLogin        EventType = "oauth.login"         // returning user logged in via social provider
 	EventOAuthRegister     EventType = "oauth.register"      // new user created via social provider
 	EventOAuthLinkRequired EventType = "oauth.link_required" // email conflict — existing account must be linked
+	EventOAuthLink         EventType = "oauth.linked"        // social provider successfully linked to an existing account
+	EventOAuthUnlink       EventType = "oauth.unlinked"      // social provider unlinked from an account
 )
 
 // Event represents a single audit log entry.

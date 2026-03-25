@@ -100,6 +100,7 @@ func run() error {
 	// 6b. Initialize OAuth2 infrastructure
 	userProviderRepo := authrepo.NewPostgresUserProviderRepo(db)
 	oauthStateStore := oauthrepo.NewRedisStateStore(rdb)
+	linkSessionStore := authrepo.NewRedisLinkSessionStore(rdb)
 
 	var oauthProviders []oauth.OAuthProvider
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
@@ -111,10 +112,10 @@ func run() error {
 		slog.Info("oauth provider registered", "provider", "google")
 	}
 
-	oauthSvc := oauth.NewOAuthService(oauthStateStore, userRepo, userProviderRepo, oauthProviders...)
+	oauthSvc := oauth.NewOAuthService(oauthStateStore, linkSessionStore, userRepo, userProviderRepo, oauthProviders...)
 
 	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc,
-		blacklistRepo, sessionRepo, tenantConfigRepo, mfaSvc,
+		blacklistRepo, sessionRepo, tenantConfigRepo, userProviderRepo, mfaSvc,
 		cfg.WhatsAppBusinessPhone, auditLogger, oauthSvc)
 
 	tokenValidator := auth.NewTokenValidator(

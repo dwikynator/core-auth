@@ -13,6 +13,7 @@ import (
 type OAuthService struct {
 	providers    map[string]OAuthProvider
 	stateStore   StateStore
+	linkStore    auth.LinkSessionStore
 	userRepo     auth.UserRepository
 	providerRepo auth.UserProviderRepository
 }
@@ -23,6 +24,7 @@ type OAuthService struct {
 // don't add the Google provider and the service will return "unsupported provider".
 func NewOAuthService(
 	stateStore StateStore,
+	linkStore auth.LinkSessionStore,
 	userRepo auth.UserRepository,
 	providerRepo auth.UserProviderRepository,
 	providers ...OAuthProvider,
@@ -37,6 +39,7 @@ func NewOAuthService(
 		stateStore:   stateStore,
 		userRepo:     userRepo,
 		providerRepo: providerRepo,
+		linkStore:    linkStore,
 	}
 }
 
@@ -84,7 +87,6 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 	if err != nil {
 		return nil, auth.ErrOAuthStateMismatch
 	}
-	_ = clientID // Will be used in Phase 5B for tenant-scoped linking
 
 	// 2. Get the provider and exchange the code.
 	provider, err := s.GetProvider(providerName)
@@ -126,6 +128,8 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 			return &auth.OAuthCallbackResult{
 				NeedsLinking:   true,
 				ProviderEmail:  userInfo.Email,
+				ProviderUserID: userInfo.ProviderUserID,
+				ClientID:       clientID,
 				ExistingUserID: existingUser.ID,
 			}, nil
 		}
@@ -185,4 +189,16 @@ func (s *OAuthService) HandleCallback(ctx context.Context, providerName, code, s
 		User:          newUser,
 		ProviderEmail: userInfo.Email,
 	}, nil
+}
+
+// CreateLinkSession stores a link session and returns the raw token.
+// Implements auth.OAuthSvc.
+func (s *OAuthService) CreateLinkSession(ctx context.Context, data *auth.LinkSessionData) (string, error) {
+	return s.linkStore.Create(ctx, data)
+}
+
+// ConsumeLinkSession retrieves and atomically deletes a link session.
+// Implements auth.OAuthSvc.
+func (s *OAuthService) ConsumeLinkSession(ctx context.Context, rawToken string) (*auth.LinkSessionData, error) {
+	return s.linkStore.Consume(ctx, rawToken)
 }

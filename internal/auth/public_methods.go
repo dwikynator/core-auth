@@ -25,5 +25,6 @@ func PublicMethods() []string {
 		authv1.AuthService_ChallengeMFA_FullMethodName,
 		authv1.AuthService_GetOAuthURL_FullMethodName,
 		authv1.AuthService_OAuthCallback_FullMethodName,
+		authv1.AuthService_LinkProvider_FullMethodName,
 	}
 }

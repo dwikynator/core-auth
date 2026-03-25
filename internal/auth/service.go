@@ -39,6 +39,7 @@ type Service struct {
 	blacklistRepo    TokenBlacklistRepository
 	sessionRepo      SessionRepository
 	tenantConfigRepo TenantConfigRepository
+	providerRepo     UserProviderRepository
 	mfaSvc           *MFAService
 	whatsappPhone    string // E.164 WhatsApp Business phone number
 	auditLogger      *audit.Logger
@@ -53,6 +54,7 @@ func NewService(
 	blacklistRepo TokenBlacklistRepository,
 	sessionRepo SessionRepository,
 	tenantConfigRepo TenantConfigRepository,
+	providerRepo UserProviderRepository,
 	mfaSvc *MFAService,
 	whatsappPhone string,
 	auditLogger *audit.Logger,
@@ -65,6 +67,7 @@ func NewService(
 		blacklistRepo:    blacklistRepo,
 		sessionRepo:      sessionRepo,
 		tenantConfigRepo: tenantConfigRepo,
+		providerRepo:     providerRepo,
 		mfaSvc:           mfaSvc,
 		whatsappPhone:    whatsappPhone,
 		auditLogger:      auditLogger,
@@ -1241,15 +1244,35 @@ func (s *Service) OAuthCallback(ctx context.Context, req *authv1.OAuthCallbackRe
 
 	// 2. Branch on the result.
 	if result.NeedsLinking {
-		// Email conflict — the user needs to verify ownership of the existing account.
-		// In Phase 5A, we return the error directly.
-		// In Phase 5B, this will return a LinkSessionToken for the linking flow.
+		// Create a short-lived link session so the client can complete the merge
+		// without restarting the OAuth2 flow from scratch.
+		linkToken, err := s.oauthSvc.CreateLinkSession(ctx, &LinkSessionData{
+			Provider:       providerName,
+			ProviderUserID: result.ProviderUserID,
+			ProviderEmail:  result.ProviderEmail,
+			ExistingUserID: result.ExistingUserID,
+			ClientID:       result.ClientID,
+		})
+		if err != nil {
+			// Non-fatal: log and fall through without a token.
+			// The client will still receive account_link_required and can
+			// restart the flow manually if link_session_token is empty.
+			slog.Error("failed to create link session", "error", err)
+			linkToken = ""
+		}
+		// Audit before returning.
+		evt := s.auditEvent(ctx, audit.EventOAuthLinkRequired, "")
+		evt.Metadata = map[string]string{
+			"provider":       providerName,
+			"provider_email": result.ProviderEmail,
+		}
+		s.auditLogger.Log(ctx, evt)
 		return &authv1.OAuthCallbackResponse{
 			Result: &authv1.OAuthCallbackResponse_AccountLinkRequired{
 				AccountLinkRequired: &authv1.AccountLinkRequired{
-					Provider:      providerName,
-					ProviderEmail: result.ProviderEmail,
-					// LinkSessionToken will be populated in Phase 5B.
+					LinkSessionToken: linkToken,
+					Provider:         providerName,
+					ProviderEmail:    result.ProviderEmail,
 				},
 			},
 		}, nil
@@ -1310,4 +1333,115 @@ func (s *Service) OAuthCallback(ctx context.Context, req *authv1.OAuthCallbackRe
 			},
 		},
 	}, nil
+}
+
+// LinkProvider completes the account-linking flow.
+// The user authenticates their existing account by providing its password,
+// and the social identity from the link session is attached to that account.
+func (s *Service) LinkProvider(ctx context.Context, req *authv1.LinkProviderRequest) (*authv1.LinkProviderResponse, error) {
+	linkToken := req.GetLinkSessionToken()
+	if linkToken == "" {
+		return nil, merr.BadRequest("LINK_SESSION_EXPIRED", "link_session_token is required")
+	}
+	password := req.GetPassword()
+	if password == "" {
+		return nil, merr.BadRequest("INVALID_ARGUMENT", "password is required")
+	}
+	// 1. Retrieve and consume the link session (single-use, atomic).
+	session, err := s.oauthSvc.ConsumeLinkSession(ctx, linkToken)
+	if err != nil {
+		return nil, err // ErrLinkSessionExpired
+	}
+	// 2. Load the conflicting user account.
+	user, err := s.repo.FindByID(ctx, session.ExistingUserID)
+	if err != nil {
+		return nil, err
+	}
+	// 3. Verify the user's password to prove they own the existing account.
+	if user.PasswordHash == nil {
+		// Social-only users have no password. This path shouldn't be reachable
+		// today (email conflicts only happen with password-based accounts), but
+		// guard it defensively.
+		return nil, merr.PreconditionFailed("NO_PASSWORD_SET", "this account has no password; contact support to link your provider")
+	}
+	if _, err := crypto.ComparePassword(password, *user.PasswordHash); err != nil {
+		return nil, ErrInvalidCredentials
+	}
+	// 4. Check account status.
+	switch user.Status {
+	case "suspended":
+		return nil, ErrAccountSuspended
+	case "deleted":
+		return nil, ErrAccountDeleted
+	}
+	// 5. Create the provider link.
+	up := &UserProvider{
+		UserID:         user.ID,
+		Provider:       session.Provider,
+		ProviderUserID: session.ProviderUserID,
+		ProviderEmail:  &session.ProviderEmail,
+	}
+	if err := s.providerRepo.Create(ctx, up); err != nil {
+		return nil, err // ErrProviderAlreadyLinked if a race occurred
+	}
+	// 6. Issue a token pair for the now-linked account.
+	clientID := session.ClientID
+	if clientID == "" {
+		clientID = "default" // fallback — should not normally happen
+	}
+	tokens, _, err := s.createSessionAndTokens(ctx, user.ID, user.Role, clientID)
+	if err != nil {
+		return nil, err
+	}
+	// 7. Audit.
+	evt := s.auditEvent(ctx, audit.EventOAuthLink, user.ID)
+	evt.Metadata = map[string]string{"provider": session.Provider}
+	s.auditLogger.Log(ctx, evt)
+	// 8. Build response.
+	profile := userToProto(user)
+	profile.Scopes = s.resolveScopes(ctx, clientID)
+	return &authv1.LinkProviderResponse{
+		User:   profile,
+		Tokens: tokens,
+	}, nil
+}
+
+// UnlinkProvider removes a social provider link from the authenticated user's account.
+// The user must retain at least one credential (password or another provider) to prevent lockout.
+func (s *Service) UnlinkProvider(ctx context.Context, req *authv1.UnlinkProviderRequest) (*authv1.UnlinkProviderResponse, error) {
+	providerName := req.GetProvider()
+	if providerName == "" {
+		return nil, merr.BadRequest("UNSUPPORTED_PROVIDER", "provider is required")
+	}
+	// 1. Resolve the caller from the JWT.
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userID := claims.Subject
+	// 2. Load the user to check whether they have a password.
+	user, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	// 3. Enforce the "last credential" invariant before touching the database.
+	//    Check: does the user have a password OR at least 2 providers?
+	providerCount, err := s.providerRepo.CountByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("count providers: %w", err)
+	}
+	hasPassword := user.PasswordHash != nil
+	if !hasPassword && providerCount <= 1 {
+		// Unlinking would leave the account with no way to log in.
+		return nil, ErrCannotUnlinkLastCredential
+	}
+	// 4. Delete the provider link.
+	if err := s.providerRepo.Delete(ctx, userID, providerName); err != nil {
+		return nil, err // ErrProviderNotLinked → 404
+	}
+	// 5. Audit.
+	evt := s.auditEvent(ctx, audit.EventOAuthUnlink, userID)
+	evt.Metadata = map[string]string{"provider": providerName}
+	s.auditLogger.Log(ctx, evt)
+	return &authv1.UnlinkProviderResponse{}, nil
 }
