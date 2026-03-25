@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
+	"github.com/dwikynator/core-auth/internal/audit"
 	"github.com/dwikynator/core-auth/internal/auth"
 	authrepo "github.com/dwikynator/core-auth/internal/auth/repository"
 	"github.com/dwikynator/core-auth/internal/config"
@@ -90,7 +91,13 @@ func run() error {
 	tokenSvc := auth.NewTokenService(tokenIssuer)
 	verificationSvc := verification.NewService(verificationRepo, emailClient, cfg.FrontendURL)
 	mfaSvc := auth.NewMFAService(mfaCredRepo, mfaSessionStore, mfaKey, cfg.JWTIssuer)
-	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc, blacklistRepo, sessionRepo, tenantConfigRepo, mfaSvc, cfg.WhatsAppBusinessPhone)
+
+	// Initialize audit logger
+	auditLogger := audit.NewLogger(slog.Default())
+
+	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc,
+		blacklistRepo, sessionRepo, tenantConfigRepo, mfaSvc,
+		cfg.WhatsAppBusinessPhone, auditLogger)
 
 	tokenValidator := auth.NewTokenValidator(
 		tokenIssuer.PublicKey(),

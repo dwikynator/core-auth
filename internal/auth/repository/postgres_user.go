@@ -222,3 +222,21 @@ func (r *postgresUserRepo) UpdatePhoneVerified(ctx context.Context, userID strin
 	}
 	return nil
 }
+
+func (r *postgresUserRepo) UpdatePasswordHash(ctx context.Context, userID string, newHash string) error {
+	const query = `
+		UPDATE users
+		SET    password_hash = $2, updated_at = NOW()
+		WHERE  id = $1
+		  AND  deleted_at IS NULL
+	`
+
+	tag, err := r.db.Exec(ctx, query, userID, newHash)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return auth.ErrUserNotFound
+	}
+	return nil
+}

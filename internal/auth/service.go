@@ -10,6 +10,7 @@ import (
 	"time"
 
 	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
+	"github.com/dwikynator/core-auth/internal/audit"
 	"github.com/dwikynator/core-auth/internal/crypto"
 	"github.com/dwikynator/core-auth/internal/validate"
 	"github.com/dwikynator/core-auth/internal/verification"
@@ -40,6 +41,7 @@ type Service struct {
 	tenantConfigRepo TenantConfigRepository
 	mfaSvc           *MFAService
 	whatsappPhone    string // E.164 WhatsApp Business phone number
+	auditLogger      *audit.Logger
 }
 
 // NewService constructs an auth service with the given repository.
@@ -52,6 +54,7 @@ func NewService(
 	tenantConfigRepo TenantConfigRepository,
 	mfaSvc *MFAService,
 	whatsappPhone string,
+	auditLogger *audit.Logger,
 ) *Service {
 	return &Service{
 		repo:             repo,
@@ -62,6 +65,22 @@ func NewService(
 		tenantConfigRepo: tenantConfigRepo,
 		mfaSvc:           mfaSvc,
 		whatsappPhone:    whatsappPhone,
+		auditLogger:      auditLogger,
+	}
+}
+
+// auditEvent creates an audit.Event pre-filled with transport metadata from ctx.
+func (s *Service) auditEvent(ctx context.Context, eventType audit.EventType, userID string) audit.Event {
+	meta := metaFromContext(ctx)
+	ip := ""
+	if meta.IPAddress != nil {
+		ip = *meta.IPAddress
+	}
+	return audit.Event{
+		Type:      eventType,
+		UserID:    userID,
+		IP:        ip,
+		UserAgent: meta.UserAgent,
 	}
 }
 
@@ -127,9 +146,15 @@ func (s *Service) Register(ctx context.Context, req *authv1.RegisterRequest) (*a
 		}
 	}
 
+	profile := userToProto(user)
+	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
+	profile.MfaEnabled = s.mfaSvc.IsEnrolled(ctx, user.ID)
+
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventRegister, user.ID))
+
 	// 7. Build response — NO tokens until verified.
 	return &authv1.RegisterResponse{
-		User: userToProto(user),
+		User: profile,
 		// Tokens intentionally omitted. Client should redirect to OTP verification screen.
 	}, nil
 }
@@ -207,6 +232,8 @@ func (s *Service) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.
 	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
 	profile.MfaEnabled = false
 
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventLogin, user.ID))
+
 	return &authv1.LoginResponse{
 		Result: &authv1.LoginResponse_LoginSuccess{
 			LoginSuccess: &authv1.LoginSuccess{
@@ -276,6 +303,8 @@ func (s *Service) SendOTP(ctx context.Context, req *authv1.SendOTPRequest) (*aut
 		return nil, merr.Internal(errReasonInternal, "failed to send otp")
 	}
 
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventOTPSent, user.ID))
+
 	return &authv1.SendOTPResponse{
 		ExpiresAt: expiresAt.Format(time.RFC3339),
 	}, nil
@@ -335,6 +364,8 @@ func (s *Service) VerifyOTP(ctx context.Context, req *authv1.VerifyOTPRequest) (
 	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
 	profile.MfaEnabled = s.mfaSvc.IsEnrolled(ctx, user.ID)
 
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventOTPVerified, user.ID))
+
 	return &authv1.VerifyOTPResponse{
 		User:   profile,
 		Tokens: tokens,
@@ -364,6 +395,8 @@ func (s *Service) SendMagicLink(ctx context.Context, req *authv1.SendMagicLinkRe
 		slog.Error("failed to send magic link", "user_id", user.ID, "error", err)
 		return nil, merr.Internal(errReasonInternal, "failed to send magic link")
 	}
+
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventMagicLinkSent, user.ID))
 
 	return &authv1.SendMagicLinkResponse{}, nil
 }
@@ -402,6 +435,8 @@ func (s *Service) VerifyMagicLink(ctx context.Context, req *authv1.VerifyMagicLi
 	profile := userToProto(user)
 	profile.Scopes = s.resolveScopes(ctx, req.GetClientId())
 	profile.MfaEnabled = s.mfaSvc.IsEnrolled(ctx, user.ID)
+
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventMagicLinkUsed, user.ID))
 
 	return &authv1.VerifyMagicLinkResponse{
 		User:   profile,
@@ -446,7 +481,128 @@ func (s *Service) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv
 		// Silently ignore lookup failures — the session may have already expired.
 	}
 
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventLogout, claims.Subject))
+
 	return &authv1.LogoutResponse{}, nil
+}
+
+// ForgotPassword initiates a password reset by sending a reset link to the
+// user's email. Always returns OK to prevent user enumeration.
+func (s *Service) ForgotPassword(ctx context.Context, req *authv1.ForgotPasswordRequest) (*authv1.ForgotPasswordResponse, error) {
+	// 1. Validate input.
+	emailAddr := strings.ToLower(strings.TrimSpace(req.GetEmail()))
+	if emailAddr == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_INVALID_IDENTIFIER_FORMAT.String(), "email is required")
+	}
+
+	// 2. Look up user by email.
+	user, err := s.repo.FindByEmail(ctx, emailAddr)
+	if err != nil {
+		// Swallow ErrUserNotFound — always return OK.
+		if err == ErrUserNotFound {
+			return &authv1.ForgotPasswordResponse{}, nil
+		}
+		return nil, merr.Internal(errReasonInternal, "failed to lookup user")
+	}
+
+	// 3. Delegate to verification service (stores hashed token, sends email).
+	if err := s.verificationSvc.SendPasswordReset(ctx, user.ID, emailAddr); err != nil {
+		slog.Error("failed to send password reset", "user_id", user.ID, "error", err)
+		// Still return OK — don't leak that the account exists but email failed.
+		return &authv1.ForgotPasswordResponse{}, nil
+	}
+
+	evt := s.auditEvent(ctx, audit.EventForgotPassword, user.ID)
+	evt.Metadata = map[string]string{"email": emailAddr}
+	s.auditLogger.Log(ctx, evt)
+
+	return &authv1.ForgotPasswordResponse{}, nil
+}
+
+// ResetPassword completes a password reset by validating the token from the
+// reset email and updating the user's password hash.
+func (s *Service) ResetPassword(ctx context.Context, req *authv1.ResetPasswordRequest) (*authv1.ResetPasswordResponse, error) {
+	// 1. Validate input.
+	if req.GetToken() == "" {
+		return nil, merr.BadRequest(authv1.ErrorReason_INVALID_TOKEN.String(), "token is required")
+	}
+
+	// 2. Validate password policy BEFORE consuming the token.
+	//    This avoids burning the one-time token if the new password is too weak.
+	if err := validate.ValidatePassword(req.GetNewPassword()); err != nil {
+		return nil, merr.BadRequest(authv1.ErrorReason_PASSWORD_POLICY_VIOLATION.String(), err.Error())
+	}
+
+	// 3. Validate and consume the password reset token.
+	token, err := s.verificationSvc.ValidateToken(ctx, req.GetToken(), verification.TokenTypePasswordReset)
+	if err != nil {
+		return nil, err // ErrTokenNotFound, ErrTokenExpired, or ErrTokenAlreadyUsed
+	}
+
+	// 4. Hash the new password.
+	hash, err := crypto.HashPassword(req.GetNewPassword(), &crypto.DefaultArgon2Params)
+	if err != nil {
+		return nil, merr.Internal(errReasonInternal, "failed to hash password")
+	}
+
+	// 5. Atomically update the password hash.
+	if err := s.repo.UpdatePasswordHash(ctx, token.UserID, hash); err != nil {
+		return nil, merr.Internal(errReasonInternal, "failed to update password")
+	}
+
+	// 6. Revoke all existing sessions — force re-login on all devices.
+	//    This is a security best practice: if the password was compromised,
+	//    the attacker's existing sessions should be invalidated.
+	_, _ = s.sessionRepo.RevokeAllForUser(ctx, token.UserID, "")
+
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventPasswordReset, token.UserID))
+
+	return &authv1.ResetPasswordResponse{}, nil
+}
+
+// ChangePassword updates the authenticated user's password.
+// Requires the current password for verification.
+func (s *Service) ChangePassword(ctx context.Context, req *authv1.ChangePasswordRequest) (*authv1.ChangePasswordResponse, error) {
+	// 1. Get the authenticated user from context.
+	claims, err := claimsFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Validate new password against policy.
+	if err := validate.ValidatePassword(req.GetNewPassword()); err != nil {
+		return nil, merr.BadRequest(authv1.ErrorReason_PASSWORD_POLICY_VIOLATION.String(), err.Error())
+	}
+
+	// 3. Fetch the user to get the current password hash.
+	user, err := s.repo.FindByID(ctx, claims.Subject)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Verify the current password.
+	if user.PasswordHash == nil {
+		return nil, ErrInvalidCredentials
+	}
+	match, err := crypto.ComparePassword(req.GetCurrentPassword(), *user.PasswordHash)
+	if err != nil || !match {
+		return nil, ErrInvalidCredentials
+	}
+
+	// 5. Hash the new password.
+	hash, err := crypto.HashPassword(req.GetNewPassword(), &crypto.DefaultArgon2Params)
+	if err != nil {
+		return nil, merr.Internal(errReasonInternal, "failed to hash password")
+	}
+
+	// 6. Update the password hash.
+	if err := s.repo.UpdatePasswordHash(ctx, user.ID, hash); err != nil {
+		return nil, merr.Internal(errReasonInternal, "failed to update password")
+	}
+
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventPasswordChange, user.ID))
+
+	return &authv1.ChangePasswordResponse{}, nil
 }
 
 // claimsContextKey is an unexported type to avoid context collisions.
@@ -739,7 +895,8 @@ func requireAdmin(ctx context.Context) (*crypto.Claims, error) {
 }
 
 func (s *Service) SuspendUser(ctx context.Context, req *authv1.SuspendUserRequest) (*authv1.SuspendUserResponse, error) {
-	if _, err := requireAdmin(ctx); err != nil {
+	claims, err := requireAdmin(ctx)
+	if err != nil {
 		return nil, err
 	}
 
@@ -767,7 +924,10 @@ func (s *Service) SuspendUser(ctx context.Context, req *authv1.SuspendUserReques
 	// (max 15 minutes), but they cannot refresh after this point.
 	_, _ = s.sessionRepo.RevokeAllForUser(ctx, userID, "")
 
-	slog.Info("user suspended", "user_id", userID, "reason", req.GetReason())
+	evt := s.auditEvent(ctx, audit.EventAccountSuspend, userID)
+	evt.Metadata = map[string]string{"reason": req.GetReason(), "admin_id": claims.Subject}
+	s.auditLogger.Log(ctx, evt)
+
 	return &authv1.SuspendUserResponse{}, nil
 }
 
@@ -786,7 +946,8 @@ func (s *Service) UnsuspendUser(ctx context.Context, req *authv1.UnsuspendUserRe
 		return nil, err
 	}
 
-	slog.Info("user unsuspended", "user_id", userID)
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventAccountUnsuspend, userID))
+
 	return &authv1.UnsuspendUserResponse{}, nil
 }
 
@@ -808,7 +969,8 @@ func (s *Service) DeleteUser(ctx context.Context, req *authv1.DeleteUserRequest)
 	// 2. Revoke all active sessions immediately.
 	_, _ = s.sessionRepo.RevokeAllForUser(ctx, userID, "")
 
-	slog.Info("user soft-deleted", "user_id", userID)
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventAccountDeleted, userID))
+
 	return &authv1.DeleteUserResponse{}, nil
 }
 
@@ -864,6 +1026,8 @@ func (s *Service) SetupTOTP(ctx context.Context, req *authv1.SetupTOTPRequest) (
 		return nil, err
 	}
 
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventMFASetup, user.ID))
+
 	return &authv1.SetupTOTPResponse{
 		Secret: result.Secret,
 		QrUri:  result.QRURI,
@@ -884,9 +1048,12 @@ func (s *Service) ConfirmTOTP(ctx context.Context, req *authv1.ConfirmTOTPReques
 		return nil, err
 	}
 
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventMFAConfirmed, claims.Subject))
+
 	return &authv1.ConfirmTOTPResponse{}, nil
 }
 
+// ChallengeMFA verifies the TOTP code and issues a new token pair.
 func (s *Service) ChallengeMFA(ctx context.Context, req *authv1.ChallengeMFARequest) (*authv1.ChallengeMFAResponse, error) {
 	// 1. Validate input.
 	if req.GetMfaSessionToken() == "" {
@@ -926,6 +1093,8 @@ func (s *Service) ChallengeMFA(ctx context.Context, req *authv1.ChallengeMFARequ
 	profile.Scopes = s.resolveScopes(ctx, sessionData.ClientID)
 	profile.MfaEnabled = true
 
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventMFAChallenged, sessionData.UserID))
+
 	return &authv1.ChallengeMFAResponse{
 		User:   profile,
 		Tokens: tokens,
@@ -960,6 +1129,8 @@ func (s *Service) DisableMFA(ctx context.Context, req *authv1.DisableMFARequest)
 	if err := s.mfaSvc.DisableForUser(ctx, claims.Subject); err != nil {
 		return nil, merr.Internal(errReasonInternal, "failed to disable MFA")
 	}
+
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventMFADisabled, claims.Subject))
 
 	return &authv1.DisableMFAResponse{}, nil
 }
@@ -1006,6 +1177,8 @@ func (s *Service) GetWhatsAppVerificationLink(ctx context.Context, req *authv1.G
 	bizPhone := strings.TrimPrefix(s.whatsappPhone, "+")
 	message := fmt.Sprintf("My verification code is: %s", otpCode)
 	waURL := fmt.Sprintf("https://wa.me/%s?text=%s", bizPhone, url.QueryEscape(message))
+
+	s.auditLogger.Log(ctx, s.auditEvent(ctx, audit.EventOTPSent, claims.Subject))
 
 	return &authv1.GetWhatsAppVerificationLinkResponse{
 		WhatsappUrl: waURL,

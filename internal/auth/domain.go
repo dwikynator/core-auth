@@ -102,6 +102,11 @@ type UserRepository interface {
 
 	// UpdatePhoneVerified sets phone_verified_at for the given user.
 	UpdatePhoneVerified(ctx context.Context, userID string) error
+
+	// UpdatePasswordHash updates the user's password hash.
+	// This is an intent-based partial update — only password_hash and updated_at are touched.
+	// Returns ErrUserNotFound if the user doesn't exist or is soft-deleted.
+	UpdatePasswordHash(ctx context.Context, userID string, newHash string) error
 }
 
 // TokenBlacklistRepository defines the contract for token revocation storage.
