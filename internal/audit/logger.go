@@ -10,25 +10,28 @@ import (
 type EventType string
 
 const (
-	EventRegister         EventType = "user.registered"
-	EventLogin            EventType = "user.login"
-	EventLoginFailed      EventType = "user.login_failed"
-	EventLogout           EventType = "user.logout"
-	EventOTPSent          EventType = "verification.otp_sent"
-	EventOTPVerified      EventType = "verification.otp_verified"
-	EventMagicLinkSent    EventType = "verification.magic_link_sent"
-	EventMagicLinkUsed    EventType = "verification.magic_link_used"
-	EventForgotPassword   EventType = "recovery.forgot_password"
-	EventPasswordReset    EventType = "recovery.password_reset"
-	EventPasswordChange   EventType = "recovery.password_changed"
-	EventMFASetup         EventType = "mfa.setup"
-	EventMFAConfirmed     EventType = "mfa.confirmed"
-	EventMFAChallenged    EventType = "mfa.challenged"
-	EventMFADisabled      EventType = "mfa.disabled"
-	EventSessionRevoked   EventType = "session.revoked"
-	EventAccountSuspend   EventType = "admin.account_suspended"
-	EventAccountUnsuspend EventType = "admin.account_unsuspended"
-	EventAccountDeleted   EventType = "admin.account_deleted"
+	EventRegister          EventType = "user.registered"
+	EventLogin             EventType = "user.login"
+	EventLoginFailed       EventType = "user.login_failed"
+	EventLogout            EventType = "user.logout"
+	EventOTPSent           EventType = "verification.otp_sent"
+	EventOTPVerified       EventType = "verification.otp_verified"
+	EventMagicLinkSent     EventType = "verification.magic_link_sent"
+	EventMagicLinkUsed     EventType = "verification.magic_link_used"
+	EventForgotPassword    EventType = "recovery.forgot_password"
+	EventPasswordReset     EventType = "recovery.password_reset"
+	EventPasswordChange    EventType = "recovery.password_changed"
+	EventMFASetup          EventType = "mfa.setup"
+	EventMFAConfirmed      EventType = "mfa.confirmed"
+	EventMFAChallenged     EventType = "mfa.challenged"
+	EventMFADisabled       EventType = "mfa.disabled"
+	EventSessionRevoked    EventType = "session.revoked"
+	EventAccountSuspend    EventType = "admin.account_suspended"
+	EventAccountUnsuspend  EventType = "admin.account_unsuspended"
+	EventAccountDeleted    EventType = "admin.account_deleted"
+	EventOAuthLogin        EventType = "oauth.login"         // returning user logged in via social provider
+	EventOAuthRegister     EventType = "oauth.register"      // new user created via social provider
+	EventOAuthLinkRequired EventType = "oauth.link_required" // email conflict — existing account must be linked
 )
 
 // Event represents a single audit log entry.

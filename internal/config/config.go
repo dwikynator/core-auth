@@ -27,6 +27,10 @@ type Config struct {
 	MFAEncryptionKey string `env:"MFA_ENCRYPTION_KEY,required"` // 32-byte hex-encoded AES-256 key
 
 	WhatsAppBusinessPhone string `env:"WHATSAPP_BUSINESS_PHONE" envDefault:"+6281234567890"`
+
+	// OAuth2 — Google
+	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
+	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
 }
 
 // Load reads .env (if present) and parses environment variables into Config.

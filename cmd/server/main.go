@@ -15,6 +15,8 @@ import (
 	"github.com/dwikynator/core-auth/internal/crypto"
 	"github.com/dwikynator/core-auth/internal/database"
 	"github.com/dwikynator/core-auth/internal/email"
+	"github.com/dwikynator/core-auth/internal/oauth"
+	oauthrepo "github.com/dwikynator/core-auth/internal/oauth/repository"
 	internalredis "github.com/dwikynator/core-auth/internal/redis"
 	"github.com/dwikynator/core-auth/internal/verification"
 	verificationrepo "github.com/dwikynator/core-auth/internal/verification/repository"
@@ -95,9 +97,25 @@ func run() error {
 	// Initialize audit logger
 	auditLogger := audit.NewLogger(slog.Default())
 
+	// 6b. Initialize OAuth2 infrastructure
+	userProviderRepo := authrepo.NewPostgresUserProviderRepo(db)
+	oauthStateStore := oauthrepo.NewRedisStateStore(rdb)
+
+	var oauthProviders []oauth.OAuthProvider
+	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		oauthProviders = append(oauthProviders, oauth.NewGoogleProvider(
+			cfg.GoogleClientID,
+			cfg.GoogleClientSecret,
+			cfg.BaseURL,
+		))
+		slog.Info("oauth provider registered", "provider", "google")
+	}
+
+	oauthSvc := oauth.NewOAuthService(oauthStateStore, userRepo, userProviderRepo, oauthProviders...)
+
 	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc,
 		blacklistRepo, sessionRepo, tenantConfigRepo, mfaSvc,
-		cfg.WhatsAppBusinessPhone, auditLogger)
+		cfg.WhatsAppBusinessPhone, auditLogger, oauthSvc)
 
 	tokenValidator := auth.NewTokenValidator(
 		tokenIssuer.PublicKey(),

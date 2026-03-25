@@ -23,5 +23,7 @@ func PublicMethods() []string {
 		authv1.AuthService_ForgotPassword_FullMethodName,
 		authv1.AuthService_ResetPassword_FullMethodName,
 		authv1.AuthService_ChallengeMFA_FullMethodName,
+		authv1.AuthService_GetOAuthURL_FullMethodName,
+		authv1.AuthService_OAuthCallback_FullMethodName,
 	}
 }

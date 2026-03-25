@@ -68,6 +68,54 @@ type MFASessionData struct {
 	Role     string `json:"role"`
 }
 
+// UserProvider represents a linked social identity provider for a user.
+// Each row in the user_providers table maps one (provider, provider_user_id)
+// pair to a user_id. A user can have multiple providers linked.
+type UserProvider struct {
+	ID             string
+	UserID         string
+	Provider       string  // "google", "apple"
+	ProviderUserID string  // The unique ID from the provider (e.g., Google sub)
+	ProviderEmail  *string // The email the provider reported (may differ from user.email)
+	CreatedAt      time.Time
+}
+
+// OAuthCallbackResult is the outcome of an OAuth2 callback returned by OAuthSvc.HandleCallback.
+// Using a flat struct (ProviderEmail string instead of a pointer into the oauth package) keeps
+// auth free of any dependency on the oauth package, breaking the import cycle.
+type OAuthCallbackResult struct {
+	// IsNewUser is true if a brand-new account was created via social login.
+	IsNewUser bool
+
+	// IsExistingLink is true if the social identity was already linked — returning user.
+	IsExistingLink bool
+
+	// NeedsLinking is true if the provider email matches an existing password-based account.
+	// The user must prove ownership before the accounts are merged (Phase 5B).
+	NeedsLinking bool
+
+	// User is the resolved user for IsNewUser or IsExistingLink cases. Nil when NeedsLinking.
+	User *User
+
+	// ProviderEmail is the email reported by the OAuth2 provider.
+	// Used to populate AccountLinkRequired.provider_email when NeedsLinking is true.
+	ProviderEmail string
+
+	// ExistingUserID is the user_id of the existing account when NeedsLinking is true.
+	ExistingUserID string
+}
+
+// OAuthSvc defines the contract the auth service uses for OAuth2 flows.
+// Defined in the auth package so auth/service.go never needs to import the oauth package,
+// avoiding a circular dependency (oauth already imports auth for shared domain types).
+type OAuthSvc interface {
+	// GenerateAuthURL returns the provider's consent URL and the server-generated CSRF state token.
+	GenerateAuthURL(ctx context.Context, provider, clientID string) (authURL, state string, err error)
+
+	// HandleCallback validates the state, exchanges the code, and resolves the user identity.
+	HandleCallback(ctx context.Context, provider, code, state string) (*OAuthCallbackResult, error)
+}
+
 // UserRepository defines the persistence contract for user operations.
 // Implementations live in internal/auth/repository/.
 type UserRepository interface {
@@ -195,4 +243,18 @@ type MFASessionStore interface {
 	// Consume retrieves and immediately deletes the session (single-use).
 	// Returns ErrInvalidMFASession if the token is not found or already consumed.
 	Consume(ctx context.Context, rawToken string) (*MFASessionData, error)
+}
+
+// UserProviderRepository defines persistence operations for social provider links.
+type UserProviderRepository interface {
+	// Create inserts a new provider link. Returns ErrProviderAlreadyLinked if the
+	// (provider, provider_user_id) pair already exists.
+	Create(ctx context.Context, up *UserProvider) error
+
+	// FindByProviderAndSubject looks up a linked provider by the provider name
+	// and the provider's unique user ID. Returns ErrProviderNotLinked if not found.
+	FindByProviderAndSubject(ctx context.Context, provider, providerUserID string) (*UserProvider, error)
+
+	// FindByUserID returns all linked providers for a given user.
+	FindByUserID(ctx context.Context, userID string) ([]*UserProvider, error)
 }
