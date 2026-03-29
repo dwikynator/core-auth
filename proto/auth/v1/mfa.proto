@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
+
+import "google/api/annotations.proto";
+import "auth/v1/shared.proto";
+
+// ---------------------------------------------------------------------------
+// MFAService
+// Manages TOTP enrollment, challenges, and lifecycle.
+// ChallengeMFA is placed here (not AuthService) because it belongs to the
+// MFA domain — it only needs a MFA session token, no credential re-check.
+//
+// Dependencies: User, Session
+// ---------------------------------------------------------------------------
+service MFAService {
+
+  // Begin TOTP enrollment. Returns a secret and QR code URI.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  //         FAILED_PRECONDITION/mfa_already_enrolled
+  rpc SetupTOTP(SetupTOTPRequest) returns (SetupTOTPResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/mfa/totp/setup"
+      body: "*"
+    };
+  }
+
+  // Confirm TOTP enrollment by validating the first code from the authenticator.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  //         UNAUTHENTICATED/mfa_invalid_code
+  rpc ConfirmTOTP(ConfirmTOTPRequest) returns (ConfirmTOTPResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/mfa/totp/confirm"
+      body: "*"
+    };
+  }
+
+  // Respond to an MFA challenge during login (after mfa_required is returned by AuthService.Login).
+  //
+  // Errors: UNAUTHENTICATED/invalid_mfa_session
+  //         UNAUTHENTICATED/mfa_invalid_code
+  //         UNAUTHENTICATED/mfa_session_expired
+  rpc ChallengeMFA(ChallengeMFARequest) returns (ChallengeMFAResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/mfa/challenge"
+      body: "*"
+    };
+  }
+
+  // Disable all MFA factors for the authenticated user.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  //         UNAUTHENTICATED/invalid_credentials (password re-confirmation required)
+  rpc DisableMFA(DisableMFARequest) returns (DisableMFAResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/mfa/disable"
+      body: "*"
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+message SetupTOTPRequest {}
+
+message SetupTOTPResponse {
+  string secret = 1; // base32-encoded TOTP secret (show once, never again)
+  string qr_uri = 2; // otpauth:// URI for QR code generation
+}
+
+message ConfirmTOTPRequest {
+  string totp_code = 1; // 6-digit code from authenticator app
+}
+
+message ConfirmTOTPResponse {}
+
+message ChallengeMFARequest {
+  string mfa_session_token = 1; // from AuthService.Login -> LoginResponse.mfa_required.mfa_session_token
+  string code              = 2; // TOTP code or WhatsApp OTP
+}
+
+message ChallengeMFAResponse {
+  UserProfile user   = 1;
+  TokenPair   tokens = 2;
+}
+
+message DisableMFARequest {
+  string password = 1; // require password re-confirmation
+}
+
+message DisableMFAResponse {}

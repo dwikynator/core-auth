@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
+
+import "google/api/annotations.proto";
+import "auth/v1/shared.proto";
+
+// ---------------------------------------------------------------------------
+// VerificationService
+// Handles all channel-based verification flows: OTP (email/phone),
+// magic links, and WhatsApp phone verification.
+//
+// Dependencies: User, Session
+// ---------------------------------------------------------------------------
+service VerificationService {
+
+  // Send an OTP to the user's email or phone number for verification.
+  //
+  // Errors: NOT_FOUND/user_not_found
+  //         FAILED_PRECONDITION/already_verified
+  //         RESOURCE_EXHAUSTED/too_many_requests
+  rpc SendOTP(SendOTPRequest) returns (SendOTPResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/otp/send"
+      body: "*"
+    };
+  }
+
+  // Verify an OTP code to activate an email address or phone number.
+  //
+  // Errors: UNAUTHENTICATED/invalid_otp
+  //         UNAUTHENTICATED/otp_expired
+  //         UNAUTHENTICATED/token_already_used
+  rpc VerifyOTP(VerifyOTPRequest) returns (VerifyOTPResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/otp/verify"
+      body: "*"
+    };
+  }
+
+  // Send a magic link to the user's email for passwordless login or signup.
+  //
+  // Errors: RESOURCE_EXHAUSTED/too_many_requests
+  rpc SendMagicLink(SendMagicLinkRequest) returns (SendMagicLinkResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/magic-link/send"
+      body: "*"
+    };
+  }
+
+  // Verify a magic link token and issue a token pair.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  //         UNAUTHENTICATED/token_expired
+  //         UNAUTHENTICATED/token_already_used
+  rpc VerifyMagicLink(VerifyMagicLinkRequest) returns (VerifyMagicLinkResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/magic-link/verify"
+      body: "*"
+    };
+  }
+
+  // Generate a WhatsApp pre-filled verification link for phone OTP.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  //         FAILED_PRECONDITION/phone_not_set
+  rpc GetWhatsAppVerificationLink(GetWhatsAppVerificationLinkRequest) returns (GetWhatsAppVerificationLinkResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/verify/whatsapp"
+      body: "*"
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+enum OTPTarget {
+  OTP_TARGET_UNSPECIFIED = 0;
+  OTP_TARGET_EMAIL       = 1;
+  OTP_TARGET_PHONE       = 2;
+}
+
+message SendOTPRequest {
+  string    email_or_phone = 1;
+  OTPTarget target         = 2;
+}
+
+message SendOTPResponse {
+  string expires_at = 1; // ISO 8601 timestamp
+}
+
+message VerifyOTPRequest {
+  string    client_id      = 1;
+  string    email_or_phone = 2;
+  OTPTarget target         = 3;
+  string    otp_code       = 4;
+}
+
+message VerifyOTPResponse {
+  // If verifying at registration, tokens are returned immediately.
+  // If verifying phone after login, tokens field is empty.
+  UserProfile user   = 1;
+  TokenPair   tokens = 2;
+}
+
+message SendMagicLinkRequest {
+  string client_id = 1;
+  string email     = 2; // required: magic link is always email-based
+}
+
+message SendMagicLinkResponse {}
+
+message VerifyMagicLinkRequest {
+  string client_id = 1;
+  string token     = 2; // the raw token from the magic link URL
+}
+
+message VerifyMagicLinkResponse {
+  UserProfile user   = 1;
+  TokenPair   tokens = 2;
+}
+
+message GetWhatsAppVerificationLinkRequest {}
+
+message GetWhatsAppVerificationLinkResponse {
+  string whatsapp_url = 1; // pre-filled wa.me link
+  string otp_code     = 2; // the code embedded in the message
+  string expires_at   = 3; // ISO 8601
+}

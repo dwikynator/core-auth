@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
+
+import "google/protobuf/timestamp.proto";
+
+// ---------------------------------------------------------------------------
+// Shared Messages
+// Imported by all service proto files that return tokens, profiles, or sessions.
+// ---------------------------------------------------------------------------
+
+// Returned on both successful login and token refresh.
+message TokenPair {
+  string access_token  = 1;
+  string refresh_token = 2;
+  int64  expires_in    = 3; // seconds until the access token expires
+}
+
+// Minimal user profile embedded in auth responses.
+message UserProfile {
+  string user_id            = 1;
+  string email              = 2;
+  string username           = 3;
+  string phone              = 4;
+  string role               = 5; // e.g. "user", "admin"
+  repeated string scopes    = 6; // OAuth2 scopes for the requesting client_id
+  bool email_verified       = 7;
+  bool phone_verified       = 8;
+  bool mfa_enabled          = 9;
+}
+
+// A single active session (device).
+message Session {
+  string session_id   = 1;
+  string client_id    = 2;
+  string ip_address   = 3;
+  string user_agent   = 4;
+  google.protobuf.Timestamp created_at  = 5;
+  google.protobuf.Timestamp last_used_at = 6;
+}

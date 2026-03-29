@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
+
+import "google/api/annotations.proto";
+import "auth/v1/shared.proto";
+
+// ---------------------------------------------------------------------------
+// SessionService
+// Manages active sessions and token lifecycle.
+// Owns: Logout, RefreshToken, ListSessions, RevokeSession, RevokeAllSessions.
+//
+// Dependencies: User, Tenant
+// ---------------------------------------------------------------------------
+service SessionService {
+
+  // Invalidate the current session. Blacklists the access token and
+  // revokes the refresh token.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout"
+      body: "*"
+    };
+  }
+
+  // Exchange a valid refresh token for a new token pair.
+  // The supplied refresh token is immediately invalidated (rotation).
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  //         UNAUTHENTICATED/token_expired
+  //         UNAUTHENTICATED/token_reuse_detected
+  //         PERMISSION_DENIED/account_suspended
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/refresh"
+      body: "*"
+    };
+  }
+
+  // List all active sessions for the authenticated user.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/auth/sessions"
+    };
+  }
+
+  // Revoke a specific session by ID.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  //         NOT_FOUND/session_not_found
+  //         PERMISSION_DENIED/session_not_owned
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse) {
+    option (google.api.http) = {
+      delete: "/v1/auth/sessions/{session_id}"
+    };
+  }
+
+  // Revoke all sessions except the current one.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  rpc RevokeAllSessions(RevokeAllSessionsRequest) returns (RevokeAllSessionsResponse) {
+    option (google.api.http) = {
+      delete: "/v1/auth/sessions"
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+message LogoutRequest {
+  string refresh_token = 1; // required: the token to revoke
+}
+
+message LogoutResponse {}
+
+message RefreshTokenRequest {
+  string client_id     = 1;
+  string refresh_token = 2;
+}
+
+message RefreshTokenResponse {
+  TokenPair tokens = 1;
+}
+
+message ListSessionsRequest {}
+
+message ListSessionsResponse {
+  repeated Session sessions   = 1;
+  string           current_id = 2; // session ID of the requester's own session
+}
+
+message RevokeSessionRequest {
+  string session_id = 1;
+}
+
+message RevokeSessionResponse {}
+
+message RevokeAllSessionsRequest {}
+
+message RevokeAllSessionsResponse {
+  int32 revoked_count = 1;
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	errs "github.com/dwikynator/core-auth/internal/libs/errors"
 	"github.com/dwikynator/core-auth/internal/verification"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -64,7 +65,7 @@ func (r *postgresVerificationRepo) FindByHashAndType(
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, verification.ErrTokenNotFound
+			return nil, errs.ErrTokenNotFound
 		}
 		return nil, err
 	}
@@ -87,7 +88,7 @@ func (r *postgresVerificationRepo) MarkUsed(ctx context.Context, tokenID string)
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return verification.ErrTokenNotFound
+		return errs.ErrTokenNotFound
 	}
 	return nil
 }

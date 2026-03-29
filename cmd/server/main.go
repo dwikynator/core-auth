@@ -7,26 +7,47 @@ import (
 	"log"
 	"log/slog"
 
-	authv1 "github.com/dwikynator/core-auth/gen/auth/v1"
-	"github.com/dwikynator/core-auth/internal/auth"
 	"github.com/dwikynator/core-auth/internal/config"
-	credrepo "github.com/dwikynator/core-auth/internal/credentials/repository"
-	identityrepo "github.com/dwikynator/core-auth/internal/identity/repository"
-	"github.com/dwikynator/core-auth/internal/infrastructure/audit"
-	"github.com/dwikynator/core-auth/internal/infrastructure/database"
-	internalredis "github.com/dwikynator/core-auth/internal/infrastructure/redis"
+	"github.com/dwikynator/core-auth/internal/infra/audit"
+	"github.com/dwikynator/core-auth/internal/infra/database"
+	internalredis "github.com/dwikynator/core-auth/internal/infra/redis"
+
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
 	"github.com/dwikynator/core-auth/internal/libs/email"
+
 	"github.com/dwikynator/core-auth/internal/oauth"
+
+	oauthgateway "github.com/dwikynator/core-auth/internal/oauth/gateway"
+
+	sessionmiddleware "github.com/dwikynator/core-auth/internal/session/middleware"
+
+	admindelivery "github.com/dwikynator/core-auth/internal/admin/delivery"
+	authdelivery "github.com/dwikynator/core-auth/internal/auth/delivery"
+	mfadelivery "github.com/dwikynator/core-auth/internal/mfa/delivery"
+	oauthdelivery "github.com/dwikynator/core-auth/internal/oauth/delivery"
+	sessiondelivery "github.com/dwikynator/core-auth/internal/session/delivery"
+	userdelivery "github.com/dwikynator/core-auth/internal/user/delivery"
+	verificationdelivery "github.com/dwikynator/core-auth/internal/verification/delivery"
+
+	adminusecase "github.com/dwikynator/core-auth/internal/admin/usecase"
+	authusecase "github.com/dwikynator/core-auth/internal/auth/usecase"
+	mfausecase "github.com/dwikynator/core-auth/internal/mfa/usecase"
+	oauthusecase "github.com/dwikynator/core-auth/internal/oauth/usecase"
+	sessionusecase "github.com/dwikynator/core-auth/internal/session/usecase"
+	tenantusecase "github.com/dwikynator/core-auth/internal/tenant/usecase"
+	userusecase "github.com/dwikynator/core-auth/internal/user/usecase"
+	verificationusecase "github.com/dwikynator/core-auth/internal/verification/usecase"
+
+	mfarepo "github.com/dwikynator/core-auth/internal/mfa/repository"
 	oauthrepo "github.com/dwikynator/core-auth/internal/oauth/repository"
 	sessionrepo "github.com/dwikynator/core-auth/internal/session/repository"
-	"github.com/dwikynator/core-auth/internal/verification"
+	tenantrepo "github.com/dwikynator/core-auth/internal/tenant/repository"
+	userrepo "github.com/dwikynator/core-auth/internal/user/repository"
 	verificationrepo "github.com/dwikynator/core-auth/internal/verification/repository"
 
 	"github.com/dwikynator/minato"
 	"github.com/dwikynator/minato/merr"
 	"github.com/dwikynator/minato/middleware"
-	"google.golang.org/grpc"
 )
 
 func main() {
@@ -38,7 +59,6 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
-	// 1. Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
@@ -46,67 +66,53 @@ func run() error {
 
 	slog.Info("configuration loaded", "grpc_port", cfg.GRPCPort, "http_port", cfg.HTTPPort)
 
-	// 2. Connect to Postgres
 	db, err := database.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("connect postgres: %w", err)
 	}
 	slog.Info("postgres connected")
 
-	// 3. Connect to Redis
 	rdb, err := internalredis.NewClient(ctx, cfg.RedisURL)
 	if err != nil {
 		return fmt.Errorf("connect redis: %w", err)
 	}
 	slog.Info("redis connected")
 
-	// 4. Initialize JWT infrastructure
 	tokenIssuer, err := crypto.NewTokenIssuer(cfg.RSAPrivateKeyPath, cfg.JWTIssuer)
 	if err != nil {
 		return fmt.Errorf("init token issuer: %w", err)
 	}
 	slog.Info("token issuer ready", "kid", tokenIssuer.KeyID())
 
-	// Pre-compute JWKS JSON (computed once, served on every request)
 	jwksJSON, err := crypto.BuildJWKS(tokenIssuer.PublicKey(), tokenIssuer.KeyID())
 	if err != nil {
 		return fmt.Errorf("build jwks: %w", err)
 	}
 
-	// 5. Initialize email infrastructure
 	emailClient := email.NewResendClient(cfg.ResendAPIKey, cfg.ResendFrom)
 	slog.Info("email client ready", "from", cfg.ResendFrom)
 
-	// 6. Initialize domain services
-	userRepo := identityrepo.NewPostgresUserRepo(db)
+	userRepo := userrepo.NewPostgresUserRepo(db)
 	verificationRepo := verificationrepo.NewPostgresVerificationRepo(db)
 	blacklistRepo := sessionrepo.NewRedisBlacklist(rdb)
 	sessionRepo := sessionrepo.NewPostgresSessionRepo(db)
-	tenantConfigRepo := identityrepo.NewPostgresTenantConfigRepo(db)
-	mfaCredRepo := credrepo.NewPostgresMFARepo(db)
-	mfaSessionStore := credrepo.NewRedisMFASessionStore(rdb)
+	tenantConfigRepo := tenantrepo.NewPostgresTenantConfigRepo(db)
+	mfaCredRepo := mfarepo.NewPostgresMFARepo(db)
+	mfaSessionStore := mfarepo.NewRedisMFASessionStore(rdb)
+	userProviderRepo := oauthrepo.NewPostgresUserProviderRepo(db)
+	oauthStateStore := oauthrepo.NewRedisStateStore(rdb)
+	linkSessionStore := oauthrepo.NewRedisLinkSessionStore(rdb)
 
-	// Parse the MFA encryption key from hex.
 	mfaKey, err := hex.DecodeString(cfg.MFAEncryptionKey)
 	if err != nil || len(mfaKey) != 32 {
 		return fmt.Errorf("MFA_ENCRYPTION_KEY must be 64 hex characters (32 bytes): %w", err)
 	}
 
-	tokenSvc := auth.NewTokenService(tokenIssuer)
-	verificationSvc := verification.NewService(verificationRepo, emailClient, cfg.FrontendURL)
-	mfaSvc := auth.NewMFAService(mfaCredRepo, mfaSessionStore, mfaKey, cfg.JWTIssuer)
-
-	// Initialize audit logger
 	auditLogger := audit.NewLogger(slog.Default())
-
-	// 6b. Initialize OAuth2 infrastructure
-	userProviderRepo := credrepo.NewPostgresUserProviderRepo(db)
-	oauthStateStore := oauthrepo.NewRedisStateStore(rdb)
-	linkSessionStore := credrepo.NewRedisLinkSessionStore(rdb)
 
 	var oauthProviders []oauth.OAuthProvider
 	if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
-		oauthProviders = append(oauthProviders, oauth.NewGoogleProvider(
+		oauthProviders = append(oauthProviders, oauthgateway.NewGoogleProvider(
 			cfg.GoogleClientID,
 			cfg.GoogleClientSecret,
 			cfg.BaseURL,
@@ -114,20 +120,25 @@ func run() error {
 		slog.Info("oauth provider registered", "provider", "google")
 	}
 
-	oauthSvc := oauth.NewOAuthService(oauthStateStore, linkSessionStore, userRepo, userProviderRepo, oauthProviders...)
+	userUc := userusecase.NewUserUseCase(userRepo, auditLogger)
+	tenantUc := tenantusecase.NewTenantUseCase(tenantConfigRepo)
+	sessionUc := sessionusecase.NewSessionUseCase(sessionRepo, blacklistRepo,
+		tokenIssuer, tenantUc, userUc, auditLogger)
+	mfaUc := mfausecase.NewMFAService(mfaCredRepo, mfaSessionStore,
+		userUc, sessionUc, auditLogger, mfaKey, cfg.JWTIssuer)
+	oauthUc := oauthusecase.NewOAuthUseCase(oauthStateStore, linkSessionStore,
+		userProviderRepo, userUc, userUc,
+		mfaUc, mfaUc, sessionUc,
+		auditLogger, oauthProviders...)
+	verificationUc := verificationusecase.NewVerificationUseCase(verificationRepo, userUc,
+		emailClient, userUc, sessionUc,
+		auditLogger, cfg.FrontendURL,
+		cfg.WhatsAppBusinessPhone)
+	adminUc := adminusecase.NewAdminUseCase(userUc, userUc, sessionUc, auditLogger)
+	authUc := authusecase.NewAuthUsecase(userUc, userUc, verificationUc, sessionUc, mfaUc, mfaUc, auditLogger)
 
-	authSvc := auth.NewService(userRepo, tokenSvc, verificationSvc,
-		blacklistRepo, sessionRepo, tenantConfigRepo, userProviderRepo, mfaSvc,
-		cfg.WhatsAppBusinessPhone, auditLogger, oauthSvc)
+	slog.Info("all use cases ready")
 
-	tokenValidator := auth.NewTokenValidator(
-		tokenIssuer.PublicKey(),
-		tokenIssuer.Issuer(),
-		blacklistRepo,
-	)
-	slog.Info("all services ready")
-
-	// 7. Create the minato server
 	grpcAddr := fmt.Sprintf(":%d", cfg.GRPCPort)
 	httpAddr := fmt.Sprintf(":%d", cfg.HTTPPort)
 
@@ -156,8 +167,8 @@ func run() error {
 		}),
 	)
 
-	// 8. Cross-transport plugins (runs on BOTH HTTP and gRPC perimeters)
-	// RecoveryPlugin MUST be first — outermost wrapper catches all panics.
+	tokenValidator := sessionmiddleware.NewTokenValidator(tokenIssuer.PublicKey(), cfg.JWTIssuer, blacklistRepo)
+
 	server.UsePlugin(
 		middleware.RecoveryPlugin(),
 		middleware.RequestIDPlugin(),
@@ -167,26 +178,28 @@ func run() error {
 	// HTTP-only middleware (browser / REST concerns)
 	server.Use(middleware.CORS())
 
-	// 9. Auth interceptor — gRPC perimeter only (Template C from middleware guide).
-	// The grpc-gateway automatically forwards the HTTP Authorization header as
-	// the gRPC `authorization` metadata key, so every gateway request is
-	// validated exactly once, at the gRPC boundary — no double-execution.
+	var publicMethods []string
+	publicMethods = append(publicMethods, authdelivery.PublicMethods()...)
+	publicMethods = append(publicMethods, sessiondelivery.PublicMethods()...)
+	publicMethods = append(publicMethods, mfadelivery.PublicMethods()...)
+	publicMethods = append(publicMethods, verificationdelivery.PublicMethods()...)
+	publicMethods = append(publicMethods, oauthdelivery.PublicMethods()...)
+
 	server.UseGRPC(middleware.AuthInterceptor(
-		middleware.WithAuthSkipPaths(auth.PublicMethods()...),
+		middleware.WithAuthSkipPaths(publicMethods...),
 		middleware.WithAuthValidator(tokenValidator.Validate),
 	))
 
-	// 10. Register gRPC services
-	server.RegisterGRPC(func(s grpc.ServiceRegistrar) {
-		authv1.RegisterAuthServiceServer(s, authSvc)
-	})
-	server.RegisterGateway(authv1.RegisterAuthServiceHandlerFromEndpoint)
+	authdelivery.RegisterAuthGRPCHandler(server, authUc, mfaUc, tenantUc)
+	userdelivery.RegisterUserGRPCHandler(server, userUc, mfaUc)
+	admindelivery.RegisterAdminGRPCHandler(server, adminUc)
+	sessiondelivery.RegisterSessionGRPCHandler(server, sessionUc)
+	mfadelivery.RegisterMFAGRPCHandler(server, mfaUc, tenantUc)
+	oauthdelivery.RegisterOAuthGRPCHandler(server, oauthUc, tenantUc, mfaUc)
+	verificationdelivery.RegisterVerificationGRPCHandler(server, verificationUc, tenantUc, mfaUc)
 
-	// 11. Pure HTTP routes (not gRPC-gateway, not subject to gRPC auth interceptor)
-	server.Router().Get("/.well-known/jwks.json", auth.NewJWKSHandler(jwksJSON))
-	server.Router().Get("/.well-known/openid-configuration", auth.NewOIDCDiscoveryHandler(cfg.BaseURL, cfg.JWTIssuer))
+	authdelivery.RegisterAuthHTTPHandler(server, jwksJSON, cfg.BaseURL, cfg.JWTIssuer)
 
-	// 12. Start (blocks until SIGINT/SIGTERM)
 	slog.Info("starting server", "grpc_addr", grpcAddr, "http_addr", httpAddr)
 	return server.Run()
 }

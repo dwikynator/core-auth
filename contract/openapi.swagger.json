@@ -1,0 +1,1545 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "auth/v1/shared.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "AuthService"
+    },
+    {
+      "name": "UserService"
+    },
+    {
+      "name": "SessionService"
+    },
+    {
+      "name": "MFAService"
+    },
+    {
+      "name": "VerificationService"
+    },
+    {
+      "name": "OAuthService"
+    },
+    {
+      "name": "AdminService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/admin/users/{userId}": {
+      "delete": {
+        "summary": "Soft-delete a user account. Sets deleted_at and revokes all sessions.\nRequires admin role.",
+        "description": "Errors: NOT_FOUND/user_not_found",
+        "operationId": "AdminService_DeleteUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DeleteUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "AdminService"
+        ]
+      }
+    },
+    "/v1/admin/users/{userId}/suspend": {
+      "post": {
+        "summary": "Suspend a user account. Revokes all active sessions immediately.\nRequires admin role.",
+        "description": "Errors: NOT_FOUND/user_not_found\n        PERMISSION_DENIED/account_suspended (already suspended)",
+        "operationId": "AdminService_SuspendUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SuspendUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AdminServiceSuspendUserBody"
+            }
+          }
+        ],
+        "tags": [
+          "AdminService"
+        ]
+      }
+    },
+    "/v1/admin/users/{userId}/unsuspend": {
+      "post": {
+        "summary": "Unsuspend a previously suspended user account.\nRequires admin role.",
+        "description": "Errors: NOT_FOUND/user_not_found",
+        "operationId": "AdminService_UnsuspendUser",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UnsuspendUserResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AdminServiceUnsuspendUserBody"
+            }
+          }
+        ],
+        "tags": [
+          "AdminService"
+        ]
+      }
+    },
+    "/v1/auth/change-password": {
+      "post": {
+        "summary": "Change password for an authenticated user.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        UNAUTHENTICATED/invalid_credentials  (wrong current password)\n        INVALID_ARGUMENT/password_policy_violation",
+        "operationId": "UserService_ChangePassword",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ChangePasswordResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ChangePasswordRequest"
+            }
+          }
+        ],
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/v1/auth/forgot-password": {
+      "post": {
+        "summary": "Initiate a password reset flow. Always returns OK to prevent user enumeration.",
+        "description": "Errors: RESOURCE_EXHAUSTED/too_many_requests",
+        "operationId": "AuthService_ForgotPassword",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ForgotPasswordResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ForgotPasswordRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/login": {
+      "post": {
+        "summary": "Authenticate with email/username/phone and password.\nIf MFA is enrolled, returns mfa_required instead of a token pair.",
+        "description": "Errors: UNAUTHENTICATED/invalid_credentials\n        FAILED_PRECONDITION/account_not_verified\n        PERMISSION_DENIED/account_suspended\n        PERMISSION_DENIED/account_deleted\n        RESOURCE_EXHAUSTED/too_many_requests\n        PERMISSION_DENIED/account_locked\n        PERMISSION_DENIED/ip_not_allowed",
+        "operationId": "AuthService_Login",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1LoginResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1LoginRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "summary": "Invalidate the current session. Blacklists the access token and\nrevokes the refresh token.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token",
+        "operationId": "SessionService_Logout",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1LogoutResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1LogoutRequest"
+            }
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/auth/magic-link/send": {
+      "post": {
+        "summary": "Send a magic link to the user's email for passwordless login or signup.",
+        "description": "Errors: RESOURCE_EXHAUSTED/too_many_requests",
+        "operationId": "VerificationService_SendMagicLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SendMagicLinkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1SendMagicLinkRequest"
+            }
+          }
+        ],
+        "tags": [
+          "VerificationService"
+        ]
+      }
+    },
+    "/v1/auth/magic-link/verify": {
+      "post": {
+        "summary": "Verify a magic link token and issue a token pair.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        UNAUTHENTICATED/token_expired\n        UNAUTHENTICATED/token_already_used",
+        "operationId": "VerificationService_VerifyMagicLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1VerifyMagicLinkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1VerifyMagicLinkRequest"
+            }
+          }
+        ],
+        "tags": [
+          "VerificationService"
+        ]
+      }
+    },
+    "/v1/auth/me": {
+      "get": {
+        "summary": "Return the authenticated user's profile.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token",
+        "operationId": "UserService_GetMe",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetMeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "UserService"
+        ]
+      }
+    },
+    "/v1/auth/mfa/challenge": {
+      "post": {
+        "summary": "Respond to an MFA challenge during login (after mfa_required is returned by AuthService.Login).",
+        "description": "Errors: UNAUTHENTICATED/invalid_mfa_session\n        UNAUTHENTICATED/mfa_invalid_code\n        UNAUTHENTICATED/mfa_session_expired",
+        "operationId": "MFAService_ChallengeMFA",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ChallengeMFAResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ChallengeMFARequest"
+            }
+          }
+        ],
+        "tags": [
+          "MFAService"
+        ]
+      }
+    },
+    "/v1/auth/mfa/disable": {
+      "post": {
+        "summary": "Disable all MFA factors for the authenticated user.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        UNAUTHENTICATED/invalid_credentials (password re-confirmation required)",
+        "operationId": "MFAService_DisableMFA",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1DisableMFAResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1DisableMFARequest"
+            }
+          }
+        ],
+        "tags": [
+          "MFAService"
+        ]
+      }
+    },
+    "/v1/auth/mfa/totp/confirm": {
+      "post": {
+        "summary": "Confirm TOTP enrollment by validating the first code from the authenticator.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        UNAUTHENTICATED/mfa_invalid_code",
+        "operationId": "MFAService_ConfirmTOTP",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ConfirmTOTPResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ConfirmTOTPRequest"
+            }
+          }
+        ],
+        "tags": [
+          "MFAService"
+        ]
+      }
+    },
+    "/v1/auth/mfa/totp/setup": {
+      "post": {
+        "summary": "Begin TOTP enrollment. Returns a secret and QR code URI.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        FAILED_PRECONDITION/mfa_already_enrolled",
+        "operationId": "MFAService_SetupTOTP",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SetupTOTPResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1SetupTOTPRequest"
+            }
+          }
+        ],
+        "tags": [
+          "MFAService"
+        ]
+      }
+    },
+    "/v1/auth/oauth/link": {
+      "post": {
+        "summary": "Link a social provider to an existing authenticated account.\nCalled after account_link_required is received from OAuthCallback.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        FAILED_PRECONDITION/provider_already_linked",
+        "operationId": "OAuthService_LinkProvider",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1LinkProviderResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1LinkProviderRequest"
+            }
+          }
+        ],
+        "tags": [
+          "OAuthService"
+        ]
+      }
+    },
+    "/v1/auth/oauth/{provider}": {
+      "get": {
+        "summary": "Get the OAuth2 authorization URL for a given provider.",
+        "description": "Errors: INVALID_ARGUMENT/unsupported_provider",
+        "operationId": "OAuthService_GetOAuthURL",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetOAuthURLResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "description": "\"google\" | \"apple\"",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "clientId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "state",
+            "description": "CSRF state token generated by the client",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "OAuthService"
+        ]
+      },
+      "delete": {
+        "summary": "Unlink a social provider from the authenticated account.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        NOT_FOUND/provider_not_linked\n        FAILED_PRECONDITION/cannot_unlink_last_credential",
+        "operationId": "OAuthService_UnlinkProvider",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1UnlinkProviderResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "OAuthService"
+        ]
+      }
+    },
+    "/v1/auth/oauth/{provider}/callback": {
+      "get": {
+        "summary": "Handle the OAuth2 provider callback. Issues a token pair on success.\nIf the provider email matches an existing account, begins the linking flow.",
+        "description": "Errors: UNAUTHENTICATED/oauth_code_invalid\n        FAILED_PRECONDITION/account_link_required  (existing account conflict)",
+        "operationId": "OAuthService_OAuthCallback",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1OAuthCallbackResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "clientId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "code",
+            "description": "authorization code from provider",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "state",
+            "description": "echoed back for CSRF verification",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "OAuthService"
+        ]
+      }
+    },
+    "/v1/auth/otp/send": {
+      "post": {
+        "summary": "Send an OTP to the user's email or phone number for verification.",
+        "description": "Errors: NOT_FOUND/user_not_found\n        FAILED_PRECONDITION/already_verified\n        RESOURCE_EXHAUSTED/too_many_requests",
+        "operationId": "VerificationService_SendOTP",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SendOTPResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1SendOTPRequest"
+            }
+          }
+        ],
+        "tags": [
+          "VerificationService"
+        ]
+      }
+    },
+    "/v1/auth/otp/verify": {
+      "post": {
+        "summary": "Verify an OTP code to activate an email address or phone number.",
+        "description": "Errors: UNAUTHENTICATED/invalid_otp\n        UNAUTHENTICATED/otp_expired\n        UNAUTHENTICATED/token_already_used",
+        "operationId": "VerificationService_VerifyOTP",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1VerifyOTPResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1VerifyOTPRequest"
+            }
+          }
+        ],
+        "tags": [
+          "VerificationService"
+        ]
+      }
+    },
+    "/v1/auth/refresh": {
+      "post": {
+        "summary": "Exchange a valid refresh token for a new token pair.\nThe supplied refresh token is immediately invalidated (rotation).",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        UNAUTHENTICATED/token_expired\n        UNAUTHENTICATED/token_reuse_detected\n        PERMISSION_DENIED/account_suspended",
+        "operationId": "SessionService_RefreshToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RefreshTokenResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RefreshTokenRequest"
+            }
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/auth/register": {
+      "post": {
+        "summary": "Register a new user account using email/username/phone + password.",
+        "description": "Errors: ALREADY_EXISTS/user_already_exists\n        INVALID_ARGUMENT/password_policy_violation\n        INVALID_ARGUMENT/invalid_identifier_format",
+        "operationId": "AuthService_Register",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RegisterResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1RegisterRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/reset-password": {
+      "post": {
+        "summary": "Complete a password reset using the token from the recovery email.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        UNAUTHENTICATED/token_expired\n        UNAUTHENTICATED/token_already_used\n        INVALID_ARGUMENT/password_policy_violation",
+        "operationId": "AuthService_ResetPassword",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ResetPasswordResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1ResetPasswordRequest"
+            }
+          }
+        ],
+        "tags": [
+          "AuthService"
+        ]
+      }
+    },
+    "/v1/auth/sessions": {
+      "get": {
+        "summary": "List all active sessions for the authenticated user.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token",
+        "operationId": "SessionService_ListSessions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListSessionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "SessionService"
+        ]
+      },
+      "delete": {
+        "summary": "Revoke all sessions except the current one.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token",
+        "operationId": "SessionService_RevokeAllSessions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RevokeAllSessionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/auth/sessions/{sessionId}": {
+      "delete": {
+        "summary": "Revoke a specific session by ID.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        NOT_FOUND/session_not_found\n        PERMISSION_DENIED/session_not_owned",
+        "operationId": "SessionService_RevokeSession",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1RevokeSessionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "SessionService"
+        ]
+      }
+    },
+    "/v1/auth/verify/whatsapp": {
+      "post": {
+        "summary": "Generate a WhatsApp pre-filled verification link for phone OTP.",
+        "description": "Errors: UNAUTHENTICATED/invalid_token\n        FAILED_PRECONDITION/phone_not_set",
+        "operationId": "VerificationService_GetWhatsAppVerificationLink",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetWhatsAppVerificationLinkResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1GetWhatsAppVerificationLinkRequest"
+            }
+          }
+        ],
+        "tags": [
+          "VerificationService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "AdminServiceSuspendUserBody": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "title": "optional: admin-provided reason for audit logging"
+        }
+      }
+    },
+    "AdminServiceUnsuspendUserBody": {
+      "type": "object"
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1AccountLinkRequired": {
+      "type": "object",
+      "properties": {
+        "linkSessionToken": {
+          "type": "string",
+          "title": "short-lived token to complete the link flow"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "providerEmail": {
+          "type": "string"
+        }
+      },
+      "description": "Returned when the provider email conflicts with an existing local account.\nThe client must prompt the user to authenticate and then call LinkProvider."
+    },
+    "v1ChallengeMFARequest": {
+      "type": "object",
+      "properties": {
+        "mfaSessionToken": {
+          "type": "string",
+          "title": "from AuthService.Login -\u003e LoginResponse.mfa_required.mfa_session_token"
+        },
+        "code": {
+          "type": "string",
+          "title": "TOTP code or WhatsApp OTP"
+        }
+      }
+    },
+    "v1ChallengeMFAResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1UserProfile"
+        },
+        "tokens": {
+          "$ref": "#/definitions/v1TokenPair"
+        }
+      }
+    },
+    "v1ChangePasswordRequest": {
+      "type": "object",
+      "properties": {
+        "currentPassword": {
+          "type": "string"
+        },
+        "newPassword": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ChangePasswordResponse": {
+      "type": "object"
+    },
+    "v1ConfirmTOTPRequest": {
+      "type": "object",
+      "properties": {
+        "totpCode": {
+          "type": "string",
+          "title": "6-digit code from authenticator app"
+        }
+      }
+    },
+    "v1ConfirmTOTPResponse": {
+      "type": "object"
+    },
+    "v1DeleteUserResponse": {
+      "type": "object"
+    },
+    "v1DisableMFARequest": {
+      "type": "object",
+      "properties": {
+        "password": {
+          "type": "string",
+          "title": "require password re-confirmation"
+        }
+      }
+    },
+    "v1DisableMFAResponse": {
+      "type": "object"
+    },
+    "v1ForgotPasswordRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ForgotPasswordResponse": {
+      "type": "object"
+    },
+    "v1GetMeResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1UserProfile"
+        }
+      }
+    },
+    "v1GetOAuthURLResponse": {
+      "type": "object",
+      "properties": {
+        "authorizationUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "v1GetWhatsAppVerificationLinkRequest": {
+      "type": "object"
+    },
+    "v1GetWhatsAppVerificationLinkResponse": {
+      "type": "object",
+      "properties": {
+        "whatsappUrl": {
+          "type": "string",
+          "title": "pre-filled wa.me link"
+        },
+        "otpCode": {
+          "type": "string",
+          "title": "the code embedded in the message"
+        },
+        "expiresAt": {
+          "type": "string",
+          "title": "ISO 8601"
+        }
+      }
+    },
+    "v1LinkProviderRequest": {
+      "type": "object",
+      "properties": {
+        "linkSessionToken": {
+          "type": "string",
+          "title": "from AccountLinkRequired"
+        },
+        "password": {
+          "type": "string",
+          "title": "verify ownership of the existing account"
+        }
+      }
+    },
+    "v1LinkProviderResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1UserProfile"
+        },
+        "tokens": {
+          "$ref": "#/definitions/v1TokenPair"
+        }
+      }
+    },
+    "v1ListSessionsResponse": {
+      "type": "object",
+      "properties": {
+        "sessions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Session"
+          }
+        },
+        "currentId": {
+          "type": "string",
+          "title": "session ID of the requester's own session"
+        }
+      }
+    },
+    "v1LoginRequest": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "title": "required"
+        },
+        "email": {
+          "type": "string",
+          "description": "Exactly one identifier is required."
+        },
+        "username": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string",
+          "title": "required"
+        }
+      }
+    },
+    "v1LoginResponse": {
+      "type": "object",
+      "properties": {
+        "loginSuccess": {
+          "$ref": "#/definitions/v1LoginSuccess"
+        },
+        "mfaRequired": {
+          "$ref": "#/definitions/v1MFARequired",
+          "title": "returned when MFA is enrolled"
+        }
+      }
+    },
+    "v1LoginSuccess": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1UserProfile"
+        },
+        "tokens": {
+          "$ref": "#/definitions/v1TokenPair"
+        }
+      }
+    },
+    "v1LogoutRequest": {
+      "type": "object",
+      "properties": {
+        "refreshToken": {
+          "type": "string",
+          "title": "required: the token to revoke"
+        }
+      }
+    },
+    "v1LogoutResponse": {
+      "type": "object"
+    },
+    "v1MFARequired": {
+      "type": "object",
+      "properties": {
+        "mfaSessionToken": {
+          "type": "string",
+          "title": "short-lived, single-use token for MFA flow"
+        },
+        "mfaType": {
+          "type": "string",
+          "title": "\"totp\" | \"whatsapp\""
+        }
+      },
+      "description": "Returned instead of tokens when MFA is enrolled.\nThe client must call MFAService.ChallengeMFA with this session token."
+    },
+    "v1OAuthCallbackResponse": {
+      "type": "object",
+      "properties": {
+        "oauthSuccess": {
+          "$ref": "#/definitions/v1OAuthSuccess"
+        },
+        "accountLinkRequired": {
+          "$ref": "#/definitions/v1AccountLinkRequired"
+        }
+      }
+    },
+    "v1OAuthSuccess": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1UserProfile"
+        },
+        "tokens": {
+          "$ref": "#/definitions/v1TokenPair"
+        }
+      }
+    },
+    "v1OTPTarget": {
+      "type": "string",
+      "enum": [
+        "OTP_TARGET_UNSPECIFIED",
+        "OTP_TARGET_EMAIL",
+        "OTP_TARGET_PHONE"
+      ],
+      "default": "OTP_TARGET_UNSPECIFIED"
+    },
+    "v1RefreshTokenRequest": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string"
+        },
+        "refreshToken": {
+          "type": "string"
+        }
+      }
+    },
+    "v1RefreshTokenResponse": {
+      "type": "object",
+      "properties": {
+        "tokens": {
+          "$ref": "#/definitions/v1TokenPair"
+        }
+      }
+    },
+    "v1RegisterRequest": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string",
+          "title": "required: identifies the tenant/application"
+        },
+        "email": {
+          "type": "string",
+          "description": "At least one identifier is required."
+        },
+        "username": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string",
+          "title": "E.164 format, e.g. +628123456789"
+        },
+        "password": {
+          "type": "string",
+          "title": "required"
+        }
+      }
+    },
+    "v1RegisterResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1UserProfile"
+        },
+        "tokens": {
+          "$ref": "#/definitions/v1TokenPair"
+        }
+      }
+    },
+    "v1ResetPasswordRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "title": "the raw token from the reset email"
+        },
+        "newPassword": {
+          "type": "string"
+        }
+      }
+    },
+    "v1ResetPasswordResponse": {
+      "type": "object"
+    },
+    "v1RevokeAllSessionsResponse": {
+      "type": "object",
+      "properties": {
+        "revokedCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "v1RevokeSessionResponse": {
+      "type": "object"
+    },
+    "v1SendMagicLinkRequest": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string",
+          "title": "required: magic link is always email-based"
+        }
+      }
+    },
+    "v1SendMagicLinkResponse": {
+      "type": "object"
+    },
+    "v1SendOTPRequest": {
+      "type": "object",
+      "properties": {
+        "emailOrPhone": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/definitions/v1OTPTarget"
+        }
+      }
+    },
+    "v1SendOTPResponse": {
+      "type": "object",
+      "properties": {
+        "expiresAt": {
+          "type": "string",
+          "title": "ISO 8601 timestamp"
+        }
+      }
+    },
+    "v1Session": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "clientId": {
+          "type": "string"
+        },
+        "ipAddress": {
+          "type": "string"
+        },
+        "userAgent": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lastUsedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "description": "A single active session (device)."
+    },
+    "v1SetupTOTPRequest": {
+      "type": "object"
+    },
+    "v1SetupTOTPResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "type": "string",
+          "title": "base32-encoded TOTP secret (show once, never again)"
+        },
+        "qrUri": {
+          "type": "string",
+          "title": "otpauth:// URI for QR code generation"
+        }
+      }
+    },
+    "v1SuspendUserResponse": {
+      "type": "object"
+    },
+    "v1TokenPair": {
+      "type": "object",
+      "properties": {
+        "accessToken": {
+          "type": "string"
+        },
+        "refreshToken": {
+          "type": "string"
+        },
+        "expiresIn": {
+          "type": "string",
+          "format": "int64",
+          "title": "seconds until the access token expires"
+        }
+      },
+      "description": "Returned on both successful login and token refresh."
+    },
+    "v1UnlinkProviderResponse": {
+      "type": "object"
+    },
+    "v1UnsuspendUserResponse": {
+      "type": "object"
+    },
+    "v1UserProfile": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string",
+          "title": "e.g. \"user\", \"admin\""
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "OAuth2 scopes for the requesting client_id"
+        },
+        "emailVerified": {
+          "type": "boolean"
+        },
+        "phoneVerified": {
+          "type": "boolean"
+        },
+        "mfaEnabled": {
+          "type": "boolean"
+        }
+      },
+      "description": "Minimal user profile embedded in auth responses."
+    },
+    "v1VerifyMagicLinkRequest": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string",
+          "title": "the raw token from the magic link URL"
+        }
+      }
+    },
+    "v1VerifyMagicLinkResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1UserProfile"
+        },
+        "tokens": {
+          "$ref": "#/definitions/v1TokenPair"
+        }
+      }
+    },
+    "v1VerifyOTPRequest": {
+      "type": "object",
+      "properties": {
+        "clientId": {
+          "type": "string"
+        },
+        "emailOrPhone": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/definitions/v1OTPTarget"
+        },
+        "otpCode": {
+          "type": "string"
+        }
+      }
+    },
+    "v1VerifyOTPResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/v1UserProfile",
+          "description": "If verifying at registration, tokens are returned immediately.\nIf verifying phone after login, tokens field is empty."
+        },
+        "tokens": {
+          "$ref": "#/definitions/v1TokenPair"
+        }
+      }
+    }
+  }
+}

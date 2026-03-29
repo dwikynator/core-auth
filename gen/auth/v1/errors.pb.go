@@ -41,32 +41,42 @@ const (
 	ErrorReason_TOKEN_EXPIRED        ErrorReason = 9
 	ErrorReason_TOKEN_ALREADY_USED   ErrorReason = 10
 	ErrorReason_TOKEN_REUSE_DETECTED ErrorReason = 11
+	ErrorReason_TOKEN_REVOKED        ErrorReason = 12
 	// ── Input Validation ──
-	ErrorReason_PASSWORD_POLICY_VIOLATION ErrorReason = 12
-	ErrorReason_INVALID_IDENTIFIER_FORMAT ErrorReason = 13
+	ErrorReason_PASSWORD_POLICY_VIOLATION ErrorReason = 13
+	ErrorReason_INVALID_IDENTIFIER_FORMAT ErrorReason = 14
+	ErrorReason_INVALID_IDENTIFIER        ErrorReason = 15
 	// ── MFA ──
-	ErrorReason_MFA_ALREADY_ENROLLED ErrorReason = 14
-	ErrorReason_MFA_INVALID_CODE     ErrorReason = 15
-	ErrorReason_MFA_SESSION_EXPIRED  ErrorReason = 16
-	ErrorReason_INVALID_MFA_SESSION  ErrorReason = 17
+	ErrorReason_MFA_ALREADY_ENROLLED ErrorReason = 16
+	ErrorReason_MFA_NOT_ENROLLED     ErrorReason = 17
+	ErrorReason_MFA_INVALID_CODE     ErrorReason = 18
+	ErrorReason_MFA_SESSION_EXPIRED  ErrorReason = 19
+	ErrorReason_INVALID_MFA_SESSION  ErrorReason = 20
+	ErrorReason_MFA_REQUIRED         ErrorReason = 21
 	// ── Verification ──
-	ErrorReason_INVALID_OTP      ErrorReason = 18
-	ErrorReason_OTP_EXPIRED      ErrorReason = 19
-	ErrorReason_ALREADY_VERIFIED ErrorReason = 20
-	ErrorReason_PHONE_NOT_SET    ErrorReason = 21
+	ErrorReason_INVALID_OTP      ErrorReason = 22
+	ErrorReason_OTP_EXPIRED      ErrorReason = 23
+	ErrorReason_ALREADY_VERIFIED ErrorReason = 24
+	ErrorReason_PHONE_NOT_SET    ErrorReason = 25
+	ErrorReason_TOKEN_NOT_FOUND  ErrorReason = 26
 	// ── Session ──
-	ErrorReason_SESSION_NOT_FOUND ErrorReason = 22
-	ErrorReason_SESSION_NOT_OWNED ErrorReason = 23
+	ErrorReason_SESSION_NOT_FOUND ErrorReason = 27
+	ErrorReason_SESSION_NOT_OWNED ErrorReason = 28
 	// ── OAuth2 ──
-	ErrorReason_UNSUPPORTED_PROVIDER          ErrorReason = 24
-	ErrorReason_OAUTH_CODE_INVALID            ErrorReason = 25
-	ErrorReason_ACCOUNT_LINK_REQUIRED         ErrorReason = 26
-	ErrorReason_PROVIDER_ALREADY_LINKED       ErrorReason = 27
-	ErrorReason_PROVIDER_NOT_LINKED           ErrorReason = 28
-	ErrorReason_CANNOT_UNLINK_LAST_CREDENTIAL ErrorReason = 29
+	ErrorReason_UNSUPPORTED_PROVIDER          ErrorReason = 29
+	ErrorReason_OAUTH_CODE_INVALID            ErrorReason = 30
+	ErrorReason_OAUTH_STATE_MISMATCH          ErrorReason = 31
+	ErrorReason_ACCOUNT_LINK_REQUIRED         ErrorReason = 32
+	ErrorReason_PROVIDER_ALREADY_LINKED       ErrorReason = 33
+	ErrorReason_PROVIDER_NOT_LINKED           ErrorReason = 34
+	ErrorReason_CANNOT_UNLINK_LAST_CREDENTIAL ErrorReason = 35
+	ErrorReason_LINK_SESSION_EXPIRED          ErrorReason = 36
+	ErrorReason_NO_PASSWORD_SET               ErrorReason = 37
+	// ── Tenant ──
+	ErrorReason_TENANT_NOT_FOUND ErrorReason = 38
 	// ── Network & Rate Limiting ──
-	ErrorReason_TOO_MANY_REQUESTS ErrorReason = 30
-	ErrorReason_IP_NOT_ALLOWED    ErrorReason = 31
+	ErrorReason_TOO_MANY_REQUESTS ErrorReason = 39
+	ErrorReason_IP_NOT_ALLOWED    ErrorReason = 40
 )
 
 // Enum value maps for ErrorReason.
@@ -84,26 +94,35 @@ var (
 		9:  "TOKEN_EXPIRED",
 		10: "TOKEN_ALREADY_USED",
 		11: "TOKEN_REUSE_DETECTED",
-		12: "PASSWORD_POLICY_VIOLATION",
-		13: "INVALID_IDENTIFIER_FORMAT",
-		14: "MFA_ALREADY_ENROLLED",
-		15: "MFA_INVALID_CODE",
-		16: "MFA_SESSION_EXPIRED",
-		17: "INVALID_MFA_SESSION",
-		18: "INVALID_OTP",
-		19: "OTP_EXPIRED",
-		20: "ALREADY_VERIFIED",
-		21: "PHONE_NOT_SET",
-		22: "SESSION_NOT_FOUND",
-		23: "SESSION_NOT_OWNED",
-		24: "UNSUPPORTED_PROVIDER",
-		25: "OAUTH_CODE_INVALID",
-		26: "ACCOUNT_LINK_REQUIRED",
-		27: "PROVIDER_ALREADY_LINKED",
-		28: "PROVIDER_NOT_LINKED",
-		29: "CANNOT_UNLINK_LAST_CREDENTIAL",
-		30: "TOO_MANY_REQUESTS",
-		31: "IP_NOT_ALLOWED",
+		12: "TOKEN_REVOKED",
+		13: "PASSWORD_POLICY_VIOLATION",
+		14: "INVALID_IDENTIFIER_FORMAT",
+		15: "INVALID_IDENTIFIER",
+		16: "MFA_ALREADY_ENROLLED",
+		17: "MFA_NOT_ENROLLED",
+		18: "MFA_INVALID_CODE",
+		19: "MFA_SESSION_EXPIRED",
+		20: "INVALID_MFA_SESSION",
+		21: "MFA_REQUIRED",
+		22: "INVALID_OTP",
+		23: "OTP_EXPIRED",
+		24: "ALREADY_VERIFIED",
+		25: "PHONE_NOT_SET",
+		26: "TOKEN_NOT_FOUND",
+		27: "SESSION_NOT_FOUND",
+		28: "SESSION_NOT_OWNED",
+		29: "UNSUPPORTED_PROVIDER",
+		30: "OAUTH_CODE_INVALID",
+		31: "OAUTH_STATE_MISMATCH",
+		32: "ACCOUNT_LINK_REQUIRED",
+		33: "PROVIDER_ALREADY_LINKED",
+		34: "PROVIDER_NOT_LINKED",
+		35: "CANNOT_UNLINK_LAST_CREDENTIAL",
+		36: "LINK_SESSION_EXPIRED",
+		37: "NO_PASSWORD_SET",
+		38: "TENANT_NOT_FOUND",
+		39: "TOO_MANY_REQUESTS",
+		40: "IP_NOT_ALLOWED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":      0,
@@ -118,26 +137,35 @@ var (
 		"TOKEN_EXPIRED":                 9,
 		"TOKEN_ALREADY_USED":            10,
 		"TOKEN_REUSE_DETECTED":          11,
-		"PASSWORD_POLICY_VIOLATION":     12,
-		"INVALID_IDENTIFIER_FORMAT":     13,
-		"MFA_ALREADY_ENROLLED":          14,
-		"MFA_INVALID_CODE":              15,
-		"MFA_SESSION_EXPIRED":           16,
-		"INVALID_MFA_SESSION":           17,
-		"INVALID_OTP":                   18,
-		"OTP_EXPIRED":                   19,
-		"ALREADY_VERIFIED":              20,
-		"PHONE_NOT_SET":                 21,
-		"SESSION_NOT_FOUND":             22,
-		"SESSION_NOT_OWNED":             23,
-		"UNSUPPORTED_PROVIDER":          24,
-		"OAUTH_CODE_INVALID":            25,
-		"ACCOUNT_LINK_REQUIRED":         26,
-		"PROVIDER_ALREADY_LINKED":       27,
-		"PROVIDER_NOT_LINKED":           28,
-		"CANNOT_UNLINK_LAST_CREDENTIAL": 29,
-		"TOO_MANY_REQUESTS":             30,
-		"IP_NOT_ALLOWED":                31,
+		"TOKEN_REVOKED":                 12,
+		"PASSWORD_POLICY_VIOLATION":     13,
+		"INVALID_IDENTIFIER_FORMAT":     14,
+		"INVALID_IDENTIFIER":            15,
+		"MFA_ALREADY_ENROLLED":          16,
+		"MFA_NOT_ENROLLED":              17,
+		"MFA_INVALID_CODE":              18,
+		"MFA_SESSION_EXPIRED":           19,
+		"INVALID_MFA_SESSION":           20,
+		"MFA_REQUIRED":                  21,
+		"INVALID_OTP":                   22,
+		"OTP_EXPIRED":                   23,
+		"ALREADY_VERIFIED":              24,
+		"PHONE_NOT_SET":                 25,
+		"TOKEN_NOT_FOUND":               26,
+		"SESSION_NOT_FOUND":             27,
+		"SESSION_NOT_OWNED":             28,
+		"UNSUPPORTED_PROVIDER":          29,
+		"OAUTH_CODE_INVALID":            30,
+		"OAUTH_STATE_MISMATCH":          31,
+		"ACCOUNT_LINK_REQUIRED":         32,
+		"PROVIDER_ALREADY_LINKED":       33,
+		"PROVIDER_NOT_LINKED":           34,
+		"CANNOT_UNLINK_LAST_CREDENTIAL": 35,
+		"LINK_SESSION_EXPIRED":          36,
+		"NO_PASSWORD_SET":               37,
+		"TENANT_NOT_FOUND":              38,
+		"TOO_MANY_REQUESTS":             39,
+		"IP_NOT_ALLOWED":                40,
 	}
 )
 
@@ -172,7 +200,7 @@ var File_auth_v1_errors_proto protoreflect.FileDescriptor
 
 const file_auth_v1_errors_proto_rawDesc = "" +
 	"\n" +
-	"\x14auth/v1/errors.proto\x12\aauth.v1*\x8d\x06\n" +
+	"\x14auth/v1/errors.proto\x12\aauth.v1*\xd4\a\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eUSER_NOT_FOUND\x10\x01\x12\x17\n" +
@@ -186,27 +214,36 @@ const file_auth_v1_errors_proto_rawDesc = "" +
 	"\rTOKEN_EXPIRED\x10\t\x12\x16\n" +
 	"\x12TOKEN_ALREADY_USED\x10\n" +
 	"\x12\x18\n" +
-	"\x14TOKEN_REUSE_DETECTED\x10\v\x12\x1d\n" +
-	"\x19PASSWORD_POLICY_VIOLATION\x10\f\x12\x1d\n" +
-	"\x19INVALID_IDENTIFIER_FORMAT\x10\r\x12\x18\n" +
-	"\x14MFA_ALREADY_ENROLLED\x10\x0e\x12\x14\n" +
-	"\x10MFA_INVALID_CODE\x10\x0f\x12\x17\n" +
-	"\x13MFA_SESSION_EXPIRED\x10\x10\x12\x17\n" +
-	"\x13INVALID_MFA_SESSION\x10\x11\x12\x0f\n" +
-	"\vINVALID_OTP\x10\x12\x12\x0f\n" +
-	"\vOTP_EXPIRED\x10\x13\x12\x14\n" +
-	"\x10ALREADY_VERIFIED\x10\x14\x12\x11\n" +
-	"\rPHONE_NOT_SET\x10\x15\x12\x15\n" +
-	"\x11SESSION_NOT_FOUND\x10\x16\x12\x15\n" +
-	"\x11SESSION_NOT_OWNED\x10\x17\x12\x18\n" +
-	"\x14UNSUPPORTED_PROVIDER\x10\x18\x12\x16\n" +
-	"\x12OAUTH_CODE_INVALID\x10\x19\x12\x19\n" +
-	"\x15ACCOUNT_LINK_REQUIRED\x10\x1a\x12\x1b\n" +
-	"\x17PROVIDER_ALREADY_LINKED\x10\x1b\x12\x17\n" +
-	"\x13PROVIDER_NOT_LINKED\x10\x1c\x12!\n" +
-	"\x1dCANNOT_UNLINK_LAST_CREDENTIAL\x10\x1d\x12\x15\n" +
-	"\x11TOO_MANY_REQUESTS\x10\x1e\x12\x12\n" +
-	"\x0eIP_NOT_ALLOWED\x10\x1fB4Z2github.com/dwikynator/core-auth/gen/auth/v1;authv1b\x06proto3"
+	"\x14TOKEN_REUSE_DETECTED\x10\v\x12\x11\n" +
+	"\rTOKEN_REVOKED\x10\f\x12\x1d\n" +
+	"\x19PASSWORD_POLICY_VIOLATION\x10\r\x12\x1d\n" +
+	"\x19INVALID_IDENTIFIER_FORMAT\x10\x0e\x12\x16\n" +
+	"\x12INVALID_IDENTIFIER\x10\x0f\x12\x18\n" +
+	"\x14MFA_ALREADY_ENROLLED\x10\x10\x12\x14\n" +
+	"\x10MFA_NOT_ENROLLED\x10\x11\x12\x14\n" +
+	"\x10MFA_INVALID_CODE\x10\x12\x12\x17\n" +
+	"\x13MFA_SESSION_EXPIRED\x10\x13\x12\x17\n" +
+	"\x13INVALID_MFA_SESSION\x10\x14\x12\x10\n" +
+	"\fMFA_REQUIRED\x10\x15\x12\x0f\n" +
+	"\vINVALID_OTP\x10\x16\x12\x0f\n" +
+	"\vOTP_EXPIRED\x10\x17\x12\x14\n" +
+	"\x10ALREADY_VERIFIED\x10\x18\x12\x11\n" +
+	"\rPHONE_NOT_SET\x10\x19\x12\x13\n" +
+	"\x0fTOKEN_NOT_FOUND\x10\x1a\x12\x15\n" +
+	"\x11SESSION_NOT_FOUND\x10\x1b\x12\x15\n" +
+	"\x11SESSION_NOT_OWNED\x10\x1c\x12\x18\n" +
+	"\x14UNSUPPORTED_PROVIDER\x10\x1d\x12\x16\n" +
+	"\x12OAUTH_CODE_INVALID\x10\x1e\x12\x18\n" +
+	"\x14OAUTH_STATE_MISMATCH\x10\x1f\x12\x19\n" +
+	"\x15ACCOUNT_LINK_REQUIRED\x10 \x12\x1b\n" +
+	"\x17PROVIDER_ALREADY_LINKED\x10!\x12\x17\n" +
+	"\x13PROVIDER_NOT_LINKED\x10\"\x12!\n" +
+	"\x1dCANNOT_UNLINK_LAST_CREDENTIAL\x10#\x12\x18\n" +
+	"\x14LINK_SESSION_EXPIRED\x10$\x12\x13\n" +
+	"\x0fNO_PASSWORD_SET\x10%\x12\x14\n" +
+	"\x10TENANT_NOT_FOUND\x10&\x12\x15\n" +
+	"\x11TOO_MANY_REQUESTS\x10'\x12\x12\n" +
+	"\x0eIP_NOT_ALLOWED\x10(B4Z2github.com/dwikynator/core-auth/gen/auth/v1;authv1b\x06proto3"
 
 var (
 	file_auth_v1_errors_proto_rawDescOnce sync.Once

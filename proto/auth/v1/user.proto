@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
+
+import "google/api/annotations.proto";
+import "auth/v1/shared.proto";
+
+// ---------------------------------------------------------------------------
+// UserService
+// Pure user-profile operations. No dependency on other services.
+// Owns: GetMe, ChangePassword.
+//
+// Note: if ChangePassword ever requires OTP step-up, move it to AuthService
+// which already depends on both User and Verification.
+//
+// Dependencies: User
+// ---------------------------------------------------------------------------
+service UserService {
+
+  // Return the authenticated user's profile.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  rpc GetMe(GetMeRequest) returns (GetMeResponse) {
+    option (google.api.http) = {
+      get: "/v1/auth/me"
+    };
+  }
+
+  // Change password for an authenticated user.
+  //
+  // Errors: UNAUTHENTICATED/invalid_token
+  //         UNAUTHENTICATED/invalid_credentials  (wrong current password)
+  //         INVALID_ARGUMENT/password_policy_violation
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/change-password"
+      body: "*"
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+message GetMeRequest {}
+
+message GetMeResponse {
+  UserProfile user = 1;
+}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  string new_password     = 2;
+}
+
+message ChangePasswordResponse {}

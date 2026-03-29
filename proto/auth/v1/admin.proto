@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
+
+import "google/api/annotations.proto";
+
+// ---------------------------------------------------------------------------
+// AdminService
+// Administrative account lifecycle operations. Requires admin role.
+// Intentionally does NOT depend on AuthService.
+//
+// Dependencies: User, Session
+// ---------------------------------------------------------------------------
+service AdminService {
+
+  // Suspend a user account. Revokes all active sessions immediately.
+  // Requires admin role.
+  //
+  // Errors: NOT_FOUND/user_not_found
+  //         PERMISSION_DENIED/account_suspended (already suspended)
+  rpc SuspendUser(SuspendUserRequest) returns (SuspendUserResponse) {
+    option (google.api.http) = {
+      post: "/v1/admin/users/{user_id}/suspend"
+      body: "*"
+    };
+  }
+
+  // Unsuspend a previously suspended user account.
+  // Requires admin role.
+  //
+  // Errors: NOT_FOUND/user_not_found
+  rpc UnsuspendUser(UnsuspendUserRequest) returns (UnsuspendUserResponse) {
+    option (google.api.http) = {
+      post: "/v1/admin/users/{user_id}/unsuspend"
+      body: "*"
+    };
+  }
+
+  // Soft-delete a user account. Sets deleted_at and revokes all sessions.
+  // Requires admin role.
+  //
+  // Errors: NOT_FOUND/user_not_found
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
+    option (google.api.http) = {
+      delete: "/v1/admin/users/{user_id}"
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+// ---------------------------------------------------------------------------
+
+message SuspendUserRequest {
+  string user_id = 1;
+  string reason  = 2; // optional: admin-provided reason for audit logging
+}
+
+message SuspendUserResponse {}
+
+message UnsuspendUserRequest {
+  string user_id = 1;
+}
+
+message UnsuspendUserResponse {}
+
+message DeleteUserRequest {
+  string user_id = 1;
+}
+
+message DeleteUserResponse {}

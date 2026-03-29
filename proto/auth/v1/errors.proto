@@ -38,18 +38,22 @@ option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
 //   token_expired             UNAUTHENTICATED        401     Token has passed its expiry time.
 //   token_already_used        UNAUTHENTICATED        401     Single-use token has already been consumed.
 //   token_reuse_detected      UNAUTHENTICATED        401     Refresh token reuse detected; possible theft. All sessions revoked.
+//   token_revoked             UNAUTHENTICATED        401     Token has been revoked.
 
 // ── Input Validation ────────────────────────────────────────────────────────
 //
 //   password_policy_violation INVALID_ARGUMENT       400     Password does not meet the minimum policy requirements.
 //   invalid_identifier_format INVALID_ARGUMENT       400     Email, phone, or username format is invalid.
+//   invalid_identifier        INVALID_ARGUMENT       400     Invalid identifier.
 
 // ── MFA ─────────────────────────────────────────────────────────────────────
 //
 //   mfa_already_enrolled      FAILED_PRECONDITION    400     User already has an active MFA factor enrolled.
+//   mfa_not_enrolled          FAILED_PRECONDITION    400     MFA is not enrolled.
 //   mfa_invalid_code          UNAUTHENTICATED        401     The provided TOTP or OTP code is incorrect.
 //   mfa_session_expired       UNAUTHENTICATED        401     The MFA challenge session has expired; restart login.
 //   invalid_mfa_session       UNAUTHENTICATED        401     The MFA session token is invalid or does not match.
+//   mfa_required              FAILED_PRECONDITION    400     MFA is required.
 
 // ── Verification ────────────────────────────────────────────────────────────
 //
@@ -57,6 +61,7 @@ option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
 //   otp_expired               UNAUTHENTICATED        401     The OTP code has expired.
 //   already_verified          FAILED_PRECONDITION    400     The email or phone is already verified.
 //   phone_not_set             FAILED_PRECONDITION    400     No phone number is associated with this account.
+//   token_not_found           NOT_FOUND              404     Token not found.
 
 // ── Session ──────────────────────────────────────────────────────────────────
 //
@@ -67,10 +72,17 @@ option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
 //
 //   unsupported_provider      INVALID_ARGUMENT       400     The requested OAuth2 provider is not configured.
 //   oauth_code_invalid        UNAUTHENTICATED        401     The authorization code from the provider is invalid or expired.
+//   oauth_state_mismatch      INVALID_ARGUMENT       400     OAuth state mismatch.
 //   account_link_required     FAILED_PRECONDITION    400     Provider email matches an existing account; linking is required.
 //   provider_already_linked   FAILED_PRECONDITION    400     This provider is already linked to the account.
 //   provider_not_linked       NOT_FOUND              404     The requested provider is not linked to this account.
 //   cannot_unlink_last_credential FAILED_PRECONDITION 400   Cannot unlink the only remaining login method.
+//   link_session_expired      UNAUTHENTICATED        401     Link session is invalid or expired.
+//   no_password_set           FAILED_PRECONDITION    400     No password set for this account.
+
+// ── Tenant ───────────────────────────────────────────────────────────────────
+//
+//   tenant_not_found          NOT_FOUND              404     Tenant not found.
 
 // ── Network & Rate Limiting ──────────────────────────────────────────────────
 //
@@ -118,36 +130,47 @@ enum ErrorReason {
   TOKEN_EXPIRED = 9;
   TOKEN_ALREADY_USED = 10;
   TOKEN_REUSE_DETECTED = 11;
+  TOKEN_REVOKED = 12;
 
   // ── Input Validation ──
-  PASSWORD_POLICY_VIOLATION = 12;
-  INVALID_IDENTIFIER_FORMAT = 13;
+  PASSWORD_POLICY_VIOLATION = 13;
+  INVALID_IDENTIFIER_FORMAT = 14;
+  INVALID_IDENTIFIER = 15;
 
   // ── MFA ──
-  MFA_ALREADY_ENROLLED = 14;
-  MFA_INVALID_CODE = 15;
-  MFA_SESSION_EXPIRED = 16;
-  INVALID_MFA_SESSION = 17;
+  MFA_ALREADY_ENROLLED = 16;
+  MFA_NOT_ENROLLED = 17;
+  MFA_INVALID_CODE = 18;
+  MFA_SESSION_EXPIRED = 19;
+  INVALID_MFA_SESSION = 20;
+  MFA_REQUIRED = 21;
 
   // ── Verification ──
-  INVALID_OTP = 18;
-  OTP_EXPIRED = 19;
-  ALREADY_VERIFIED = 20;
-  PHONE_NOT_SET = 21;
+  INVALID_OTP = 22;
+  OTP_EXPIRED = 23;
+  ALREADY_VERIFIED = 24;
+  PHONE_NOT_SET = 25;
+  TOKEN_NOT_FOUND = 26;
 
   // ── Session ──
-  SESSION_NOT_FOUND = 22;
-  SESSION_NOT_OWNED = 23;
+  SESSION_NOT_FOUND = 27;
+  SESSION_NOT_OWNED = 28;
 
   // ── OAuth2 ──
-  UNSUPPORTED_PROVIDER = 24;
-  OAUTH_CODE_INVALID = 25;
-  ACCOUNT_LINK_REQUIRED = 26;
-  PROVIDER_ALREADY_LINKED = 27;
-  PROVIDER_NOT_LINKED = 28;
-  CANNOT_UNLINK_LAST_CREDENTIAL = 29;
+  UNSUPPORTED_PROVIDER = 29;
+  OAUTH_CODE_INVALID = 30;
+  OAUTH_STATE_MISMATCH = 31;
+  ACCOUNT_LINK_REQUIRED = 32;
+  PROVIDER_ALREADY_LINKED = 33;
+  PROVIDER_NOT_LINKED = 34;
+  CANNOT_UNLINK_LAST_CREDENTIAL = 35;
+  LINK_SESSION_EXPIRED = 36;
+  NO_PASSWORD_SET = 37;
+
+  // ── Tenant ──
+  TENANT_NOT_FOUND = 38;
 
   // ── Network & Rate Limiting ──
-  TOO_MANY_REQUESTS = 30;
-  IP_NOT_ALLOWED = 31;
+  TOO_MANY_REQUESTS = 39;
+  IP_NOT_ALLOWED = 40;
 }

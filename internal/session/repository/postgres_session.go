@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/dwikynator/core-auth/internal/auth"
-	domain "github.com/dwikynator/core-auth/internal/session/domain"
+	errs "github.com/dwikynator/core-auth/internal/libs/errors"
+	domain "github.com/dwikynator/core-auth/internal/session"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -61,7 +61,7 @@ func (r *postgresSessionRepo) FindByRefreshTokenHash(ctx context.Context, hash s
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, auth.ErrSessionNotFound
+			return nil, errs.ErrSessionNotFound
 		}
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (r *postgresSessionRepo) RotateRefreshToken(ctx context.Context, sessionID,
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return auth.ErrSessionNotFound
+		return errs.ErrSessionNotFound
 	}
 	return nil
 }
@@ -101,7 +101,7 @@ func (r *postgresSessionRepo) Revoke(ctx context.Context, sessionID, userID stri
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return auth.ErrSessionNotFound
+		return errs.ErrSessionNotFound
 	}
 	return nil
 }

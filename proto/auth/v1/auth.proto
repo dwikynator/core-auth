@@ -5,49 +5,17 @@ package auth.v1;
 option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
 
 import "google/api/annotations.proto";
-import "google/protobuf/timestamp.proto";
-
-// ---------------------------------------------------------------------------
-// Shared Messages
-// ---------------------------------------------------------------------------
-
-// Returned on both successful login and token refresh.
-message TokenPair {
-  string access_token  = 1;
-  string refresh_token = 2;
-  int64  expires_in    = 3; // seconds until the access token expires
-}
-
-// A single active session (device).
-message Session {
-  string session_id   = 1;
-  string client_id    = 2;
-  string ip_address   = 3;
-  string user_agent   = 4;
-  google.protobuf.Timestamp created_at  = 5;
-  google.protobuf.Timestamp last_used_at = 6;
-}
-
-// Minimal user profile embedded in auth responses.
-message UserProfile {
-  string user_id            = 1;
-  string email              = 2;
-  string username           = 3;
-  string phone              = 4;
-  string role               = 5; // e.g. "user", "admin"
-  repeated string scopes    = 6; // OAuth2 scopes for the requesting client_id
-  bool email_verified       = 7;
-  bool phone_verified       = 8;
-  bool mfa_enabled          = 9;
-}
+import "auth/v1/shared.proto";
 
 // ---------------------------------------------------------------------------
 // AuthService
-// Handles all authentication, verification, session and MFA operations.
+// Orchestration entry point for flows that span multiple domains.
+// Owns: credential-based registration, login (with MFA gate), and the
+// password-recovery flow (forgot + reset).
+//
+// Dependencies: User, Verification, Session, MFA
 // ---------------------------------------------------------------------------
 service AuthService {
-
-  // ── Registration & Login ───────────────────────────────────────────────
 
   // Register a new user account using email/username/phone + password.
   //
@@ -78,102 +46,6 @@ service AuthService {
     };
   }
 
-  // Invalidate the current session. Blacklists the access token and
-  // revokes the refresh token.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  rpc Logout(LogoutRequest) returns (LogoutResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/logout"
-      body: "*"
-    };
-  }
-
-  // Exchange a valid refresh token for a new token pair.
-  // The supplied refresh token is immediately invalidated (rotation).
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         UNAUTHENTICATED/token_expired
-  //         UNAUTHENTICATED/token_reuse_detected
-  //         PERMISSION_DENIED/account_suspended
-  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/refresh"
-      body: "*"
-    };
-  }
-
-  // Return the authenticated user's profile.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  rpc GetMe(GetMeRequest) returns (GetMeResponse) {
-    option (google.api.http) = {
-      get: "/v1/auth/me"
-    };
-  }
-
-  // Change password for an authenticated user.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         UNAUTHENTICATED/invalid_credentials  (wrong current password)
-  //         INVALID_ARGUMENT/password_policy_violation
-  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/change-password"
-      body: "*"
-    };
-  }
-
-  // ── Account Verification ───────────────────────────────────────────────
-
-  // Send an OTP to the user's email or phone number for verification.
-  //
-  // Errors: NOT_FOUND/user_not_found
-  //         FAILED_PRECONDITION/already_verified
-  //         RESOURCE_EXHAUSTED/too_many_requests
-  rpc SendOTP(SendOTPRequest) returns (SendOTPResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/otp/send"
-      body: "*"
-    };
-  }
-
-  // Verify an OTP code to activate an email address or phone number.
-  //
-  // Errors: UNAUTHENTICATED/invalid_otp
-  //         UNAUTHENTICATED/otp_expired
-  //         UNAUTHENTICATED/token_already_used
-  rpc VerifyOTP(VerifyOTPRequest) returns (VerifyOTPResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/otp/verify"
-      body: "*"
-    };
-  }
-
-  // Send a magic link to the user's email for passwordless login or signup.
-  //
-  // Errors: RESOURCE_EXHAUSTED/too_many_requests
-  rpc SendMagicLink(SendMagicLinkRequest) returns (SendMagicLinkResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/magic-link/send"
-      body: "*"
-    };
-  }
-
-  // Verify a magic link token and issue a token pair.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         UNAUTHENTICATED/token_expired
-  //         UNAUTHENTICATED/token_already_used
-  rpc VerifyMagicLink(VerifyMagicLinkRequest) returns (VerifyMagicLinkResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/magic-link/verify"
-      body: "*"
-    };
-  }
-
-  // ── Password Recovery ──────────────────────────────────────────────────
-
   // Initiate a password reset flow. Always returns OK to prevent user enumeration.
   //
   // Errors: RESOURCE_EXHAUSTED/too_many_requests
@@ -196,182 +68,11 @@ service AuthService {
       body: "*"
     };
   }
-
-  // ── Multi-Factor Authentication (MFA) ──────────────────────────────────
-
-  // Begin TOTP enrollment. Returns a secret and QR code URI.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         FAILED_PRECONDITION/mfa_already_enrolled
-  rpc SetupTOTP(SetupTOTPRequest) returns (SetupTOTPResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/mfa/totp/setup"
-      body: "*"
-    };
-  }
-
-  // Confirm TOTP enrollment by validating the first code from the authenticator.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         UNAUTHENTICATED/mfa_invalid_code
-  rpc ConfirmTOTP(ConfirmTOTPRequest) returns (ConfirmTOTPResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/mfa/totp/confirm"
-      body: "*"
-    };
-  }
-
-  // Respond to an MFA challenge during login (after mfa_required is returned).
-  //
-  // Errors: UNAUTHENTICATED/invalid_mfa_session
-  //         UNAUTHENTICATED/mfa_invalid_code
-  //         UNAUTHENTICATED/mfa_session_expired
-  rpc ChallengeMFA(ChallengeMFARequest) returns (ChallengeMFAResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/mfa/challenge"
-      body: "*"
-    };
-  }
-
-  // Disable all MFA factors for the authenticated user.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         UNAUTHENTICATED/invalid_credentials (password re-confirmation required)
-  rpc DisableMFA(DisableMFARequest) returns (DisableMFAResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/mfa/disable"
-      body: "*"
-    };
-  }
-
-  // Generate a WhatsApp pre-filled verification link for phone OTP.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         FAILED_PRECONDITION/phone_not_set
-  rpc GetWhatsAppVerificationLink(GetWhatsAppVerificationLinkRequest) returns (GetWhatsAppVerificationLinkResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/verify/whatsapp"
-      body: "*"
-    };
-  }
-
-  // ── Session Management ─────────────────────────────────────────────────
-
-  // List all active sessions for the authenticated user.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
-    option (google.api.http) = {
-      get: "/v1/auth/sessions"
-    };
-  }
-
-  // Revoke a specific session by ID.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         NOT_FOUND/session_not_found
-  //         PERMISSION_DENIED/session_not_owned
-  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse) {
-    option (google.api.http) = {
-      delete: "/v1/auth/sessions/{session_id}"
-    };
-  }
-
-  // Revoke all sessions except the current one.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  rpc RevokeAllSessions(RevokeAllSessionsRequest) returns (RevokeAllSessionsResponse) {
-    option (google.api.http) = {
-      delete: "/v1/auth/sessions"
-    };
-  }
-
-  // ── OAuth2 / Social Login ──────────────────────────────────────────────
-
-  // Get the OAuth2 authorization URL for a given provider.
-  //
-  // Errors: INVALID_ARGUMENT/unsupported_provider
-  rpc GetOAuthURL(GetOAuthURLRequest) returns (GetOAuthURLResponse) {
-    option (google.api.http) = {
-      get: "/v1/auth/oauth/{provider}"
-    };
-  }
-
-  // Handle the OAuth2 provider callback. Issues a token pair on success.
-  // If the provider email matches an existing account, begins the linking flow.
-  //
-  // Errors: UNAUTHENTICATED/oauth_code_invalid
-  //         FAILED_PRECONDITION/account_link_required  (existing account conflict)
-  rpc OAuthCallback(OAuthCallbackRequest) returns (OAuthCallbackResponse) {
-    option (google.api.http) = {
-      get: "/v1/auth/oauth/{provider}/callback"
-    };
-  }
-
-  // Link a social provider to an existing authenticated account.
-  // Called after account_link_required is received from OAuthCallback.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         FAILED_PRECONDITION/provider_already_linked
-  rpc LinkProvider(LinkProviderRequest) returns (LinkProviderResponse) {
-    option (google.api.http) = {
-      post: "/v1/auth/oauth/link"
-      body: "*"
-    };
-  }
-
-  // Unlink a social provider from the authenticated account.
-  //
-  // Errors: UNAUTHENTICATED/invalid_token
-  //         NOT_FOUND/provider_not_linked
-  //         FAILED_PRECONDITION/cannot_unlink_last_credential
-  rpc UnlinkProvider(UnlinkProviderRequest) returns (UnlinkProviderResponse) {
-    option (google.api.http) = {
-      delete: "/v1/auth/oauth/{provider}"
-    };
-  }
-
-  // Admin: Account Lifecycle
-
-  // Suspend a user account. Revokes all active sessions immediately.
-  // Requires admin role.
-  //
-  // Errors: NOT_FOUND/user_not_found
-  //         PERMISSION_DENIED/account_suspended (already suspended)
-  rpc SuspendUser(SuspendUserRequest) returns (SuspendUserResponse) {
-    option (google.api.http) = {
-      post: "/v1/admin/users/{user_id}/suspend"
-      body: "*"
-    };
-  }
-
-  // Unsuspend a previously suspended user account.
-  // Requires admin role.
-  //
-  // Errors: NOT_FOUND/user_not_found
-  rpc UnsuspendUser(UnsuspendUserRequest) returns (UnsuspendUserResponse) {
-    option (google.api.http) = {
-      post: "/v1/admin/users/{user_id}/unsuspend"
-      body: "*"
-    };
-  }
-
-  // Soft-delete a user account. Sets deleted_at and revokes all sessions.
-  // Requires admin role.
-  //
-  // Errors: NOT_FOUND/user_not_found
-  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
-    option (google.api.http) = {
-      delete: "/v1/admin/users/{user_id}"
-    };
-  }
 }
 
 // ---------------------------------------------------------------------------
-// Request / Response Messages
+// Messages
 // ---------------------------------------------------------------------------
-
-// ── Registration & Login ────────────────────────────────────────────────────
 
 message RegisterRequest {
   string client_id = 1; // required: identifies the tenant/application
@@ -385,8 +86,8 @@ message RegisterRequest {
 }
 
 message RegisterResponse {
-  UserProfile user      = 1;
-  TokenPair   tokens    = 2;
+  UserProfile user   = 1;
+  TokenPair   tokens = 2;
 }
 
 message LoginRequest {
@@ -413,89 +114,11 @@ message LoginSuccess {
 }
 
 // Returned instead of tokens when MFA is enrolled.
-// The client must call ChallengeMFA with this session token.
+// The client must call MFAService.ChallengeMFA with this session token.
 message MFARequired {
   string mfa_session_token = 1; // short-lived, single-use token for MFA flow
   string mfa_type          = 2; // "totp" | "whatsapp"
 }
-
-message LogoutRequest {
-  string refresh_token = 1; // required: the token to revoke
-}
-
-message LogoutResponse {}
-
-message RefreshTokenRequest {
-  string client_id     = 1;
-  string refresh_token = 2;
-}
-
-message RefreshTokenResponse {
-  TokenPair tokens = 1;
-}
-
-message GetMeRequest {}
-
-message GetMeResponse {
-  UserProfile user = 1;
-}
-
-message ChangePasswordRequest {
-  string current_password = 1;
-  string new_password     = 2;
-}
-
-message ChangePasswordResponse {}
-
-// ── Account Verification ────────────────────────────────────────────────────
-
-enum OTPTarget {
-  OTP_TARGET_UNSPECIFIED = 0;
-  OTP_TARGET_EMAIL       = 1;
-  OTP_TARGET_PHONE       = 2;
-}
-
-message SendOTPRequest {
-  string    email_or_phone = 1;
-  OTPTarget target         = 2;
-}
-
-message SendOTPResponse {
-  string expires_at = 1; // ISO 8601 timestamp
-}
-
-message VerifyOTPRequest {
-  string    client_id      = 1;
-  string    email_or_phone = 2;
-  OTPTarget target         = 3;
-  string    otp_code       = 4;
-}
-
-message VerifyOTPResponse {
-  // If verifying at registration, tokens are returned immediately.
-  // If verifying phone after login, tokens field is empty.
-  UserProfile user   = 1;
-  TokenPair   tokens = 2;
-}
-
-message SendMagicLinkRequest {
-  string client_id = 1;
-  string email     = 2; // required: magic link is always email-based
-}
-
-message SendMagicLinkResponse {}
-
-message VerifyMagicLinkRequest {
-  string client_id = 1;
-  string token     = 2; // the raw token from the magic link URL
-}
-
-message VerifyMagicLinkResponse {
-  UserProfile user   = 1;
-  TokenPair   tokens = 2;
-}
-
-// ── Password Recovery ───────────────────────────────────────────────────────
 
 message ForgotPasswordRequest {
   string email = 1;
@@ -509,137 +132,3 @@ message ResetPasswordRequest {
 }
 
 message ResetPasswordResponse {}
-
-// ── Multi-Factor Authentication (MFA) ──────────────────────────────────────
-
-message SetupTOTPRequest {}
-
-message SetupTOTPResponse {
-  string secret   = 1; // base32-encoded TOTP secret (show once, never again)
-  string qr_uri   = 2; // otpauth:// URI for QR code generation
-}
-
-message ConfirmTOTPRequest {
-  string totp_code = 1; // 6-digit code from authenticator app
-}
-
-message ConfirmTOTPResponse {}
-
-message ChallengeMFARequest {
-  string mfa_session_token = 1; // from MFARequired.mfa_session_token
-  string code              = 2; // TOTP code or WhatsApp OTP
-}
-
-message ChallengeMFAResponse {
-  UserProfile user   = 1;
-  TokenPair   tokens = 2;
-}
-
-message DisableMFARequest {
-  string password = 1; // require password re-confirmation
-}
-
-message DisableMFAResponse {}
-
-message GetWhatsAppVerificationLinkRequest {}
-
-message GetWhatsAppVerificationLinkResponse {
-  string whatsapp_url = 1; // pre-filled wa.me link
-  string otp_code     = 2; // the code embedded in the message
-  string expires_at   = 3; // ISO 8601
-}
-
-// ── Session Management ──────────────────────────────────────────────────────
-
-message ListSessionsRequest {}
-
-message ListSessionsResponse {
-  repeated Session sessions   = 1;
-  string           current_id = 2; // session ID of the requester's own session
-}
-
-message RevokeSessionRequest {
-  string session_id = 1;
-}
-
-message RevokeSessionResponse {}
-
-message RevokeAllSessionsRequest {}
-
-message RevokeAllSessionsResponse {
-  int32 revoked_count = 1;
-}
-
-// ── OAuth2 / Social Login ────────────────────────────────────────────────────
-
-message GetOAuthURLRequest {
-  string client_id = 1;
-  string provider  = 2; // "google" | "apple"
-  string state     = 3; // CSRF state token generated by the client
-}
-
-message GetOAuthURLResponse {
-  string authorization_url = 1;
-}
-
-message OAuthCallbackRequest {
-  string client_id = 1;
-  string provider  = 2;
-  string code      = 3;  // authorization code from provider
-  string state     = 4;  // echoed back for CSRF verification
-}
-
-message OAuthCallbackResponse {
-  oneof result {
-    OAuthSuccess         oauth_success         = 1;
-    AccountLinkRequired  account_link_required = 2;
-  }
-}
-
-message OAuthSuccess {
-  UserProfile user   = 1;
-  TokenPair   tokens = 2;
-}
-
-// Returned when the provider email conflicts with an existing local account.
-// The client must prompt the user to authenticate and then call LinkProvider.
-message AccountLinkRequired {
-  string link_session_token = 1; // short-lived token to complete the link flow
-  string provider           = 2;
-  string provider_email     = 3;
-}
-
-message LinkProviderRequest {
-  string link_session_token = 1; // from AccountLinkRequired
-  string password           = 2; // verify ownership of the existing account
-}
-
-message LinkProviderResponse {
-  UserProfile user   = 1;
-  TokenPair   tokens = 2;
-}
-
-message UnlinkProviderRequest {
-  string provider = 1;
-}
-
-message UnlinkProviderResponse {}
-
-message SuspendUserRequest {
-  string user_id = 1;
-  string reason  = 2; // optional: admin-provided reason for audit logging
-}
-
-message SuspendUserResponse {}
-
-message UnsuspendUserRequest {
-  string user_id = 1;
-}
-
-message UnsuspendUserResponse {}
-
-message DeleteUserRequest {
-  string user_id = 1;
-}
-
-message DeleteUserResponse {}

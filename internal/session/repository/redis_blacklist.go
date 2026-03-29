@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	domain "github.com/dwikynator/core-auth/internal/session/domain"
+	domain "github.com/dwikynator/core-auth/internal/session"
 	"github.com/redis/go-redis/v9"
 )
 

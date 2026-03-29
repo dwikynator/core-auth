@@ -9,8 +9,24 @@ endif
 PROTO_SRC := proto
 PROTO_DEPS := third_party
 GEN_OUT := gen
+CONTRACT_OUT := contract
 
 # Proto Generation
+#
+# All service protos live under proto/auth/v1/ and share the same Go package
+# (gen/auth/v1;authv1). They are compiled in a single protoc invocation so
+# cross-file message references (e.g. shared.proto -> TokenPair) resolve correctly.
+PROTO_FILES := \
+	$(PROTO_SRC)/auth/v1/shared.proto \
+	$(PROTO_SRC)/auth/v1/auth.proto \
+	$(PROTO_SRC)/auth/v1/user.proto \
+	$(PROTO_SRC)/auth/v1/session.proto \
+	$(PROTO_SRC)/auth/v1/mfa.proto \
+	$(PROTO_SRC)/auth/v1/verification.proto \
+	$(PROTO_SRC)/auth/v1/oauth.proto \
+	$(PROTO_SRC)/auth/v1/admin.proto \
+	$(PROTO_SRC)/auth/v1/errors.proto
+
 proto:
 	@echo "==> Generating auth protos..."
 	protoc \
@@ -19,14 +35,11 @@ proto:
 		--go_out=$(GEN_OUT) --go_opt=paths=source_relative \
 		--go-grpc_out=$(GEN_OUT) --go-grpc_opt=paths=source_relative \
 		--grpc-gateway_out=$(GEN_OUT) --grpc-gateway_opt=paths=source_relative \
-		$(PROTO_SRC)/auth/v1/auth.proto
-	
-	protoc \
-		-I $(PROTO_SRC) \
-		-I $(PROTO_DEPS) \
-		--go_out=$(GEN_OUT) --go_opt=paths=source_relative \
-		--go-grpc_out=$(GEN_OUT) --go-grpc_opt=paths=source_relative \
-		$(PROTO_SRC)/auth/v1/errors.proto
+		--openapiv2_out=$(CONTRACT_OUT) \
+		--openapiv2_opt=allow_merge=true \
+		--openapiv2_opt=merge_file_name=openapi \
+		$(PROTO_FILES)
+		
 	@echo "==> Proto generation complete."
 
 # Application
