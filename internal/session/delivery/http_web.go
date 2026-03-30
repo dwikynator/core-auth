@@ -11,22 +11,29 @@ import (
 	"github.com/dwikynator/minato"
 )
 
-type sessionHTTPHandler struct {
+type sessionWebHandler struct {
 	sessionUc    session.SessionUsecase
 	secureCookie bool
 }
 
-// RegisterSessionHTTPHandler registers the pure-HTTP cookie-based session routes.
-// These routes are for browser web clients only.
-// Mobile apps and non-browser clients continue to use the gRPC-gateway JSON endpoints.
-func RegisterSessionHTTPHandler(s *minato.Server, sessionUc session.SessionUsecase, secureCookie bool) {
-	h := &sessionHTTPHandler{
+// RegisterSessionWebHandler registers the cookie-based session routes on the
+// given /v1/web sub-router.
+//
+// CSRF middleware is applied internally via a nested group, scoping it only
+// to /refresh and /logout. The /login route (owned by RegisterAuthWebHandler)
+// sits on the same /v1/web group without CSRF because the browser has no
+// csrf_token cookie before the first successful login.
+func RegisterSessionWebHandler(r *minato.Router, sessionUc session.SessionUsecase, secureCookie bool) {
+	h := &sessionWebHandler{
 		sessionUc:    sessionUc,
 		secureCookie: secureCookie,
 	}
-	s.Router().Group("/v1/web", func(r *minato.Router) {
-		// These are pure-REST routes, not gRPC-gateway generated.
-		// They are registered directly on the chi router.
+
+	// Nest a CSRF-enforced sub-group for all cookie-mutating routes.
+	// /refresh and /logout both carry the refresh_token cookie, making them
+	// CSRF-vulnerable. The CSRF middleware validates X-CSRF-Token header
+	// against the csrf_token cookie before the handler is reached.
+	r.Group("/", func(r *minato.Router) {
 		r.Use(csrf.Middleware)
 		r.Post("/refresh", h.RefreshCookie)
 		r.Post("/logout", h.LogoutCookie)
@@ -38,7 +45,7 @@ func RegisterSessionHTTPHandler(s *minato.Server, sessionUc session.SessionUseca
 // back into a fresh cookie pair.
 //
 // The caller (JavaScript frontend) must echo the X-CSRF-Token header.
-func (h *sessionHTTPHandler) RefreshCookie(w http.ResponseWriter, r *http.Request) {
+func (h *sessionWebHandler) RefreshCookie(w http.ResponseWriter, r *http.Request) {
 	// 1. Read the refresh token from the HttpOnly cookie.
 	//    The browser sends this automatically; JavaScript cannot read it.
 	c, err := r.Cookie(cookie.RefreshTokenCookieName)
@@ -55,8 +62,6 @@ func (h *sessionHTTPHandler) RefreshCookie(w http.ResponseWriter, r *http.Reques
 		ClientId:     clientID,
 	})
 	if err != nil {
-		// Map domain errors to HTTP responses.
-		// In production, use your merr error handler for structured output.
 		http.Error(w, `{"error":{"code":"INVALID_TOKEN","message":"failed to refresh token"}}`, http.StatusUnauthorized)
 		return
 	}
@@ -86,7 +91,7 @@ func (h *sessionHTTPHandler) RefreshCookie(w http.ResponseWriter, r *http.Reques
 // LogoutCookie invalidates the cookie session by clearing both cookies.
 // The gRPC Logout endpoint handles token blacklisting; this handler just
 // clears the browser-side cookies regardless of the usecase call outcome.
-func (h *sessionHTTPHandler) LogoutCookie(w http.ResponseWriter, r *http.Request) {
+func (h *sessionWebHandler) LogoutCookie(w http.ResponseWriter, r *http.Request) {
 	// Clear both cookies immediately, even if the usecase call fails.
 	// This ensures the browser's session is always wiped client-side.
 	cookie.ClearRefreshToken(w)

@@ -211,7 +211,13 @@ func run() error {
 
 	authdelivery.RegisterAuthHTTPHandler(server, jwksJSON, cfg.BaseURL, cfg.JWTIssuer)
 
-	sessiondelivery.RegisterSessionHTTPHandler(server, sessionUc, true)
+	// /v1/web — browser-only cookie-based routes.
+	// Both handlers receive the same sub-router r from the callback.
+	// CSRF scoping (refresh/logout only) is applied inside RegisterSessionWebHandler.
+	server.Router().Group("/v1/web", func(r *minato.Router) {
+		authdelivery.RegisterAuthWebHandler(r, authUc, cfg.SecureCookie)
+		sessiondelivery.RegisterSessionWebHandler(r, sessionUc, cfg.SecureCookie)
+	})
 
 	slog.Info("starting server", "grpc_addr", grpcAddr, "http_addr", httpAddr)
 	return server.Run()
