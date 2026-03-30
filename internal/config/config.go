@@ -39,6 +39,8 @@ type Config struct {
 	RateLimitIPWindow            time.Duration `env:"RATE_LIMIT_IP_WINDOW"              envDefault:"15m"`
 	RateLimitMaxFailedPerAccount int           `env:"RATE_LIMIT_MAX_FAILED_PER_ACCOUNT" envDefault:"10"`
 	RateLimitAccountLockout      time.Duration `env:"RATE_LIMIT_ACCOUNT_LOCKOUT"        envDefault:"15m"`
+
+	SecureCookie bool `env:"SECURE_COOKIE" envDefault:"true"`
 }
 
 // Load reads .env (if present) and parses environment variables into Config.

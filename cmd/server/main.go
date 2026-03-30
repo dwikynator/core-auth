@@ -211,6 +211,8 @@ func run() error {
 
 	authdelivery.RegisterAuthHTTPHandler(server, jwksJSON, cfg.BaseURL, cfg.JWTIssuer)
 
+	sessiondelivery.RegisterSessionHTTPHandler(server, sessionUc, true)
+
 	slog.Info("starting server", "grpc_addr", grpcAddr, "http_addr", httpAddr)
 	return server.Run()
 }
