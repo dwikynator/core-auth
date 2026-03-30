@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 )
@@ -31,6 +33,12 @@ type Config struct {
 	// OAuth2 — Google
 	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
+
+	// Rate Limiting & Account Lockout (Phase 6A)
+	RateLimitMaxFailedPerIP      int           `env:"RATE_LIMIT_MAX_FAILED_PER_IP"      envDefault:"30"`
+	RateLimitIPWindow            time.Duration `env:"RATE_LIMIT_IP_WINDOW"              envDefault:"15m"`
+	RateLimitMaxFailedPerAccount int           `env:"RATE_LIMIT_MAX_FAILED_PER_ACCOUNT" envDefault:"10"`
+	RateLimitAccountLockout      time.Duration `env:"RATE_LIMIT_ACCOUNT_LOCKOUT"        envDefault:"15m"`
 }
 
 // Load reads .env (if present) and parses environment variables into Config.

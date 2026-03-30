@@ -11,6 +11,8 @@ import (
 	userdomain "github.com/dwikynator/core-auth/internal/user"
 
 	"errors"
+
+	contextlib "github.com/dwikynator/core-auth/internal/libs/context"
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
 	errs "github.com/dwikynator/core-auth/internal/libs/errors"
 	"github.com/dwikynator/core-auth/internal/libs/validate"
@@ -24,10 +26,11 @@ type authUsecase struct {
 	sessionService      auth.SessionService
 	mfaService          auth.MFAService
 	mfaProvider         auth.MFAProvider
+	rateLimiter         auth.RateLimiter
 	auditLogger         auth.AuditLogger
 }
 
-func NewAuthUsecase(userService auth.UserService, userProvider auth.UserProvider, verificationService auth.VerificationService, sessionService auth.SessionService, mfaService auth.MFAService, mfaProvider auth.MFAProvider, auditLogger auth.AuditLogger) auth.AuthUsecase {
+func NewAuthUsecase(userService auth.UserService, userProvider auth.UserProvider, verificationService auth.VerificationService, sessionService auth.SessionService, mfaService auth.MFAService, mfaProvider auth.MFAProvider, rateLimiter auth.RateLimiter, auditLogger auth.AuditLogger) auth.AuthUsecase {
 	return &authUsecase{
 		userService:         userService,
 		userProvider:        userProvider,
@@ -35,6 +38,7 @@ func NewAuthUsecase(userService auth.UserService, userProvider auth.UserProvider
 		sessionService:      sessionService,
 		mfaService:          mfaService,
 		mfaProvider:         mfaProvider,
+		rateLimiter:         rateLimiter,
 		auditLogger:         auditLogger,
 	}
 }
@@ -108,6 +112,16 @@ func (uc *authUsecase) Register(ctx context.Context, req *auth.RegisterRequest) 
 
 // Login
 func (uc *authUsecase) Login(ctx context.Context, req *auth.LoginRequest) (*auth.LoginResponse, error) {
+	meta := contextlib.MetaFromContext(ctx)
+	ip := ""
+	if meta.IPAddress != nil {
+		ip = *meta.IPAddress
+	}
+
+	if err := uc.rateLimiter.CheckIPLimit(ctx, ip); err != nil {
+		return nil, err // Returns ErrTooManyRequests
+	}
+
 	// 1. Determine which identifier the client sent.
 	identifier := ""
 	for _, v := range []string{req.Email, req.Username, req.Phone} {
@@ -128,9 +142,22 @@ func (uc *authUsecase) Login(ctx context.Context, req *auth.LoginRequest) (*auth
 	if err != nil {
 		// Map ErrUserNotFound → ErrInvalidCredentials to prevent user enumeration.
 		if errors.Is(err, errs.ErrUserNotFound) {
+			_ = uc.rateLimiter.RecordAttempt(ctx, &auth.LoginAttempt{
+				UserID:    "", // Empty string maps to NULL in db
+				IPAddress: ip,
+				Success:   false,
+			})
+
 			return nil, errs.ErrInvalidCredentials
 		}
 		return nil, err
+	}
+
+	if err := uc.rateLimiter.CheckAccountLockout(ctx, user.ID); err != nil {
+		if errors.Is(err, errs.ErrAccountLocked) {
+			uc.auditLogger.Log(ctx, audit.NewEvent(ctx, audit.EventAccountLocked, user.ID))
+		}
+		return nil, err // Returns ErrAccountLocked
 	}
 
 	// 3. Reject accounts that cannot log in.
@@ -149,8 +176,22 @@ func (uc *authUsecase) Login(ctx context.Context, req *auth.LoginRequest) (*auth
 	}
 	match, err := crypto.ComparePassword(req.Password, *user.PasswordHash)
 	if err != nil || !match {
+		_ = uc.rateLimiter.RecordAttempt(ctx, &auth.LoginAttempt{
+			UserID:    user.ID,
+			IPAddress: ip,
+			Success:   false,
+		})
+		
+		uc.auditLogger.Log(ctx, audit.NewEvent(ctx, audit.EventLoginFailed, user.ID))
+		
 		return nil, errs.ErrInvalidCredentials
 	}
+
+	_ = uc.rateLimiter.RecordAttempt(ctx, &auth.LoginAttempt{
+		UserID:    user.ID,
+		IPAddress: ip,
+		Success:   true,
+	})
 
 	// 5. Check if MFA is enrolled.
 	if uc.mfaProvider.IsEnrolled(ctx, user.ID) {

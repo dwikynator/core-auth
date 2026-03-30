@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dwikynator/core-auth/internal/mfa"
+	"github.com/dwikynator/core-auth/internal/ratelimit"
 	"github.com/dwikynator/core-auth/internal/session"
 	"github.com/dwikynator/core-auth/internal/user"
 	"github.com/dwikynator/core-auth/internal/verification"
@@ -50,6 +51,16 @@ type MFAService interface {
 type MFAProvider interface {
 	IsEnrolled(ctx context.Context, userID string) bool
 }
+
+// RateLimiter checks and records login rate limits and account lockouts.
+// The concrete implementation lives in internal/ratelimit/usecase/.
+// We use ratelimit.RateLimitUseCase directly to share the canonical LoginAttempt
+// type and avoid a duplicate type that would prevent structural interface satisfaction.
+type RateLimiter = ratelimit.RateLimitUseCase
+
+// LoginAttempt is an alias for the canonical ratelimit.LoginAttempt type.
+// Declared here so call sites in auth/usecase can construct it without importing ratelimit explicitly.
+type LoginAttempt = ratelimit.LoginAttempt
 
 type RegisterRequest struct {
 	Email    string

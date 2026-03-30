@@ -21,6 +21,8 @@ import (
 
 	sessionmiddleware "github.com/dwikynator/core-auth/internal/session/middleware"
 
+	"github.com/dwikynator/core-auth/internal/ratelimit"
+
 	admindelivery "github.com/dwikynator/core-auth/internal/admin/delivery"
 	authdelivery "github.com/dwikynator/core-auth/internal/auth/delivery"
 	mfadelivery "github.com/dwikynator/core-auth/internal/mfa/delivery"
@@ -33,6 +35,7 @@ import (
 	authusecase "github.com/dwikynator/core-auth/internal/auth/usecase"
 	mfausecase "github.com/dwikynator/core-auth/internal/mfa/usecase"
 	oauthusecase "github.com/dwikynator/core-auth/internal/oauth/usecase"
+	ratelimitusecase "github.com/dwikynator/core-auth/internal/ratelimit/usecase"
 	sessionusecase "github.com/dwikynator/core-auth/internal/session/usecase"
 	tenantusecase "github.com/dwikynator/core-auth/internal/tenant/usecase"
 	userusecase "github.com/dwikynator/core-auth/internal/user/usecase"
@@ -40,6 +43,7 @@ import (
 
 	mfarepo "github.com/dwikynator/core-auth/internal/mfa/repository"
 	oauthrepo "github.com/dwikynator/core-auth/internal/oauth/repository"
+	ratelimitrepo "github.com/dwikynator/core-auth/internal/ratelimit/repository"
 	sessionrepo "github.com/dwikynator/core-auth/internal/session/repository"
 	tenantrepo "github.com/dwikynator/core-auth/internal/tenant/repository"
 	userrepo "github.com/dwikynator/core-auth/internal/user/repository"
@@ -102,6 +106,7 @@ func run() error {
 	userProviderRepo := oauthrepo.NewPostgresUserProviderRepo(db)
 	oauthStateStore := oauthrepo.NewRedisStateStore(rdb)
 	linkSessionStore := oauthrepo.NewRedisLinkSessionStore(rdb)
+	loginAttemptsRepo := ratelimitrepo.NewPostgresLoginAttemptsRepo(db)
 
 	mfaKey, err := hex.DecodeString(cfg.MFAEncryptionKey)
 	if err != nil || len(mfaKey) != 32 {
@@ -134,8 +139,14 @@ func run() error {
 		emailClient, userUc, sessionUc,
 		auditLogger, cfg.FrontendURL,
 		cfg.WhatsAppBusinessPhone)
+	rateLimitUc := ratelimitusecase.NewRateLimiter(loginAttemptsRepo, ratelimit.Config{
+		MaxFailedAttemptsPerIP:      cfg.RateLimitMaxFailedPerIP,
+		IPWindowDuration:            cfg.RateLimitIPWindow,
+		MaxFailedAttemptsPerAccount: cfg.RateLimitMaxFailedPerAccount,
+		AccountLockoutDuration:      cfg.RateLimitAccountLockout,
+	})
 	adminUc := adminusecase.NewAdminUseCase(userUc, userUc, sessionUc, auditLogger)
-	authUc := authusecase.NewAuthUsecase(userUc, userUc, verificationUc, sessionUc, mfaUc, mfaUc, auditLogger)
+	authUc := authusecase.NewAuthUsecase(userUc, userUc, verificationUc, sessionUc, mfaUc, mfaUc, rateLimitUc, auditLogger)
 
 	slog.Info("all use cases ready")
 

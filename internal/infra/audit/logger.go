@@ -36,6 +36,7 @@ const (
 	EventOAuthLinkRequired EventType = "oauth.link_required" // email conflict — existing account must be linked
 	EventOAuthLink         EventType = "oauth.linked"        // social provider successfully linked to an existing account
 	EventOAuthUnlink       EventType = "oauth.unlinked"      // social provider unlinked from an account
+	EventAccountLocked     EventType = "security.account_locked"
 )
 
 // Event represents a single audit log entry.
