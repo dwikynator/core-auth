@@ -52,6 +52,12 @@ type MFAProvider interface {
 	IsEnrolled(ctx context.Context, userID string) bool
 }
 
+// TenantPolicy is the subset of the tenant usecase that auth needs.
+// Defined here (consumer-owned) to avoid import cycles.
+type TenantPolicy interface {
+	CheckIPPolicy(ctx context.Context, clientID string, ip string) error
+}
+
 // RateLimiter checks and records login rate limits and account lockouts.
 // The concrete implementation lives in internal/ratelimit/usecase/.
 // We use ratelimit.RateLimitUseCase directly to share the canonical LoginAttempt

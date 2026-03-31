@@ -48,10 +48,12 @@ func (r *postgresTenantConfigRepo) FindByClientID(ctx context.Context, clientID 
 	// 2. Cache miss or stale — query Postgres.
 	const query = `
 		SELECT client_id,
-		       EXTRACT(EPOCH FROM access_token_ttl)::bigint,
-		       EXTRACT(EPOCH FROM refresh_token_ttl)::bigint,
-			   default_scopes,
-		       created_at, updated_at
+			EXTRACT(EPOCH FROM access_token_ttl)::bigint,
+			EXTRACT(EPOCH FROM refresh_token_ttl)::bigint,
+			default_scopes,
+			ip_allowlist,
+			ip_denylist,
+			created_at, updated_at
 		FROM   tenant_configs
 		WHERE  client_id = $1
 	`
@@ -63,6 +65,8 @@ func (r *postgresTenantConfigRepo) FindByClientID(ctx context.Context, clientID 
 		&accessSecs,
 		&refreshSecs,
 		&tc.DefaultScopes,
+		&tc.IPPolicy.Allowlist, // pgx scans TEXT[] → []string directly
+		&tc.IPPolicy.Denylist,
 		&tc.CreatedAt,
 		&tc.UpdatedAt,
 	)

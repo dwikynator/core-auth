@@ -37,6 +37,8 @@ const (
 	EventOAuthLink         EventType = "oauth.linked"        // social provider successfully linked to an existing account
 	EventOAuthUnlink       EventType = "oauth.unlinked"      // social provider unlinked from an account
 	EventAccountLocked     EventType = "security.account_locked"
+	EventSuspiciousLogin   EventType = "security.suspicious_login" // Login from a new/unknown IP
+	EventIPBlocked         EventType = "security.ip_blocked"       // Login/refresh blocked by IP policy
 )
 
 // Event represents a single audit log entry.

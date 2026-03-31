@@ -27,10 +27,11 @@ type authUsecase struct {
 	mfaService          auth.MFAService
 	mfaProvider         auth.MFAProvider
 	rateLimiter         auth.RateLimiter
+	tenantPolicy        auth.TenantPolicy
 	auditLogger         auth.AuditLogger
 }
 
-func NewAuthUsecase(userService auth.UserService, userProvider auth.UserProvider, verificationService auth.VerificationService, sessionService auth.SessionService, mfaService auth.MFAService, mfaProvider auth.MFAProvider, rateLimiter auth.RateLimiter, auditLogger auth.AuditLogger) auth.AuthUsecase {
+func NewAuthUsecase(userService auth.UserService, userProvider auth.UserProvider, verificationService auth.VerificationService, sessionService auth.SessionService, mfaService auth.MFAService, mfaProvider auth.MFAProvider, rateLimiter auth.RateLimiter, tenantPolicy auth.TenantPolicy, auditLogger auth.AuditLogger) auth.AuthUsecase {
 	return &authUsecase{
 		userService:         userService,
 		userProvider:        userProvider,
@@ -39,6 +40,7 @@ func NewAuthUsecase(userService auth.UserService, userProvider auth.UserProvider
 		mfaService:          mfaService,
 		mfaProvider:         mfaProvider,
 		rateLimiter:         rateLimiter,
+		tenantPolicy:        tenantPolicy,
 		auditLogger:         auditLogger,
 	}
 }
@@ -181,20 +183,43 @@ func (uc *authUsecase) Login(ctx context.Context, req *auth.LoginRequest) (*auth
 			IPAddress: ip,
 			Success:   false,
 		})
-		
+
 		uc.auditLogger.Log(ctx, audit.NewEvent(ctx, audit.EventLoginFailed, user.ID))
-		
+
 		return nil, errs.ErrInvalidCredentials
 	}
 
+	// 5. IP policy check.
+	// Run BEFORE recording the success. If the IP is blocked,
+	// we reject the login without recording a successful attempt.
+	if err := uc.tenantPolicy.CheckIPPolicy(ctx, req.ClientId, ip); err != nil {
+		evt := audit.NewEvent(ctx, audit.EventIPBlocked, user.ID)
+		evt.Metadata = map[string]string{"ip": ip, "client_id": req.ClientId}
+		uc.auditLogger.Log(ctx, evt)
+		return nil, errs.ErrIPNotAllowed
+	}
+
+	// 6. Suspicious login detection.
+	// CheckSuspiciousLogin must run BEFORE we record this attempt as successful.
+	result, _ := uc.rateLimiter.CheckSuspiciousLogin(ctx, user.ID, ip)
+	if result.Suspicious {
+		evt := audit.NewEvent(ctx, audit.EventSuspiciousLogin, user.ID)
+		evt.Metadata = map[string]string{"ip": ip, "client_id": req.ClientId}
+		uc.auditLogger.Log(ctx, evt)
+	}
+
+	// Record success now that the historical IP checks have completed.
 	_ = uc.rateLimiter.RecordAttempt(ctx, &auth.LoginAttempt{
 		UserID:    user.ID,
 		IPAddress: ip,
 		Success:   true,
 	})
 
-	// 5. Check if MFA is enrolled.
-	if uc.mfaProvider.IsEnrolled(ctx, user.ID) {
+	// 7. MFA check — enroll-based OR forced by suspicious IP policy.
+	// ForceMFA is true only when the IP is new AND action == "challenge_mfa".
+	// If MFA is not enrolled and ForceMFA is true, we fall through to token
+	// issuance — the audit log entry is the only signal in that case.
+	if uc.mfaProvider.IsEnrolled(ctx, user.ID) || result.ForceMFA {
 		// MFA is active — create a short-lived MFA session instead of issuing tokens.
 		mfaToken, err := uc.mfaService.CreateSession(ctx, &mfa.MFASessionData{
 			UserID:   user.ID,

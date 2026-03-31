@@ -125,7 +125,7 @@ type OAuthCallbackResult struct {
 	IsExistingLink bool
 
 	// NeedsLinking is true if the provider email matches an existing password-based account.
-	// The user must prove ownership before the accounts are merged (Phase 5B).
+	// The user must prove ownership before the accounts are merged.
 	NeedsLinking bool
 
 	// User is the resolved user for IsNewUser or IsExistingLink cases. Nil when NeedsLinking.

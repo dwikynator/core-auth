@@ -3,6 +3,7 @@ package context
 import (
 	"context"
 	"net"
+	"strings"
 
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
 	"github.com/dwikynator/minato/merr"
@@ -23,8 +24,10 @@ func MetaFromContext(ctx context.Context) requestMeta {
 
 	// IP address: grpc-gateway sets x-forwarded-for, or we fall back to peer address.
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		if vals := md.Get("x-forwarded-for"); len(vals) > 0 {
-			ip := vals[0]
+		if vals := md.Get("x-forwarded-for"); len(vals) > 0 && vals[0] != "" {
+			// X-Forwarded-For: client, proxy1, proxy2
+			parts := strings.Split(vals[0], ",")
+			ip := strings.TrimSpace(parts[0])
 			meta.IPAddress = &ip
 		}
 		if vals := md.Get("grpcgateway-user-agent"); len(vals) > 0 {

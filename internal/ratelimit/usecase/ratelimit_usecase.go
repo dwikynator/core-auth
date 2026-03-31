@@ -59,3 +59,30 @@ func (uc *rateLimitUsecase) CheckAccountLockout(ctx context.Context, userID stri
 	}
 	return nil
 }
+
+// CheckSuspiciousLogin checks whether the current login IP is new for this user
+// and resolves what the caller should do about it.
+// Fails open on DB errors — a DB outage should never block the login flow.
+func (uc *rateLimitUsecase) CheckSuspiciousLogin(ctx context.Context, userID string, ip string) (ratelimit.SuspiciousLoginResult, error) {
+	zero := ratelimit.SuspiciousLoginResult{}
+
+	if !uc.config.SuspiciousLogin.Enabled || ip == "" || userID == "" {
+		return zero, nil
+	}
+
+	since := time.Now().Add(-uc.config.SuspiciousLogin.KnownIPWindow)
+	known, err := uc.repo.IsKnownIP(ctx, userID, ip, since)
+	if err != nil {
+		// Fail open: a DB error should not block auth.
+		return zero, nil
+	}
+
+	if known {
+		return zero, nil // IP is familiar — nothing to flag.
+	}
+
+	return ratelimit.SuspiciousLoginResult{
+		Suspicious: true,
+		ForceMFA:   uc.config.SuspiciousLogin.Action == ratelimit.SuspiciousLoginChallengeMFA,
+	}, nil
+}

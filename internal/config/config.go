@@ -34,13 +34,18 @@ type Config struct {
 	GoogleClientID     string `env:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
 
-	// Rate Limiting & Account Lockout (Phase 6A)
+	// Rate Limiting & Account Lockout
 	RateLimitMaxFailedPerIP      int           `env:"RATE_LIMIT_MAX_FAILED_PER_IP"      envDefault:"30"`
 	RateLimitIPWindow            time.Duration `env:"RATE_LIMIT_IP_WINDOW"              envDefault:"15m"`
 	RateLimitMaxFailedPerAccount int           `env:"RATE_LIMIT_MAX_FAILED_PER_ACCOUNT" envDefault:"10"`
 	RateLimitAccountLockout      time.Duration `env:"RATE_LIMIT_ACCOUNT_LOCKOUT"        envDefault:"15m"`
 
 	SecureCookie bool `env:"SECURE_COOKIE" envDefault:"true"`
+
+	// Advanced Abuse Detection
+	SuspiciousLoginEnabled bool          `env:"SUSPICIOUS_LOGIN_ENABLED"    envDefault:"true"`
+	SuspiciousLoginWindow  time.Duration `env:"SUSPICIOUS_LOGIN_WINDOW"     envDefault:"2160h"`      // 90 days
+	SuspiciousLoginAction  string        `env:"SUSPICIOUS_LOGIN_ACTION"     envDefault:"audit_only"` // "audit_only" | "challenge_mfa"
 }
 
 // Load reads .env (if present) and parses environment variables into Config.

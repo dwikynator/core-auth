@@ -58,3 +58,18 @@ func (r *postgresLoginAttemptsRepo) CountFailedByIP(ctx context.Context, ip stri
 	err := r.db.QueryRow(ctx, q, ip, since).Scan(&count)
 	return count, err
 }
+
+func (r *postgresLoginAttemptsRepo) IsKnownIP(ctx context.Context, userID string, ip string, since time.Time) (bool, error) {
+	const q = `
+        SELECT EXISTS (
+            SELECT 1 FROM login_attempts
+            WHERE user_id   = $1
+              AND ip_address = $2::inet
+              AND success    = true
+              AND attempted_at >= $3
+        )
+    `
+	var known bool
+	err := r.db.QueryRow(ctx, q, userID, ip, since).Scan(&known)
+	return known, err
+}

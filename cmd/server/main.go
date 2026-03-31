@@ -144,9 +144,14 @@ func run() error {
 		IPWindowDuration:            cfg.RateLimitIPWindow,
 		MaxFailedAttemptsPerAccount: cfg.RateLimitMaxFailedPerAccount,
 		AccountLockoutDuration:      cfg.RateLimitAccountLockout,
+		SuspiciousLogin: ratelimit.SuspiciousLoginConfig{
+			Enabled:       cfg.SuspiciousLoginEnabled,
+			KnownIPWindow: cfg.SuspiciousLoginWindow,
+			Action:        ratelimit.SuspiciousLoginAction(cfg.SuspiciousLoginAction),
+		},
 	})
 	adminUc := adminusecase.NewAdminUseCase(userUc, userUc, sessionUc, auditLogger)
-	authUc := authusecase.NewAuthUsecase(userUc, userUc, verificationUc, sessionUc, mfaUc, mfaUc, rateLimitUc, auditLogger)
+	authUc := authusecase.NewAuthUsecase(userUc, userUc, verificationUc, sessionUc, mfaUc, mfaUc, rateLimitUc, tenantUc, auditLogger)
 
 	slog.Info("all use cases ready")
 

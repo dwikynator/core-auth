@@ -26,6 +26,11 @@ type LoginAttemptsRepository interface {
 	// CountFailedByIP returns the number of failed attempts from a given IP
 	// address within the lookback window. Used for IP-level rate limiting.
 	CountFailedByIP(ctx context.Context, ip string, since time.Time) (int, error)
+
+	// IsKnownIP returns true if the given IP has been associated with at least
+	// one successful login by this user within the lookback window.
+	// Used by suspicious login detection to determine whether to flag or challenge.
+	IsKnownIP(ctx context.Context, userID string, ip string, since time.Time) (bool, error)
 }
 
 // RateLimiter is the primary use-case interface consumed by the auth domain.
@@ -45,6 +50,12 @@ type RateLimitUseCase interface {
 	// CheckAccountLockout returns an error if the user account is locked due
 	// to too many recent failed attempts.
 	CheckAccountLockout(ctx context.Context, userID string) error
+
+	// CheckSuspiciousLogin inspects whether the login IP is new for this user.
+	// Returns a SuspiciousLoginResult describing what action the caller should take.
+	// Always returns a zero-value result (both fields false) if detection is disabled,
+	// the IP is empty, or a DB error occurs (fail-open).
+	CheckSuspiciousLogin(ctx context.Context, userID string, ip string) (SuspiciousLoginResult, error)
 }
 
 // Config holds tunable thresholds for rate limiting and lockout.
@@ -63,6 +74,9 @@ type Config struct {
 
 	// AccountLockoutDuration is the sliding window for the account lockout check.
 	AccountLockoutDuration time.Duration
+
+	// SuspiciousLoginConfig holds the knobs for the detection policy.
+	SuspiciousLogin SuspiciousLoginConfig
 }
 
 // DefaultConfig returns safe, sensible production defaults.
@@ -73,4 +87,42 @@ func DefaultConfig() Config {
 		MaxFailedAttemptsPerAccount: 10,
 		AccountLockoutDuration:      15 * time.Minute,
 	}
+}
+
+// SuspiciousLoginAction controls what happens when a login from a new IP is detected.
+type SuspiciousLoginAction string
+
+const (
+	// SuspiciousLoginAuditOnly logs the event and lets the login proceed.
+	SuspiciousLoginAuditOnly SuspiciousLoginAction = "audit_only"
+
+	// SuspiciousLoginChallengeMFA requires the user to complete a TOTP challenge
+	// before tokens are issued. Only applies when MFA is enrolled.
+	SuspiciousLoginChallengeMFA SuspiciousLoginAction = "challenge_mfa"
+)
+
+// SuspiciousLoginResult carries the outcome of a CheckSuspiciousLogin call.
+// Having a struct instead of a bare bool avoids a future breaking signature change
+// if more signal fields are added (e.g., IsNewCountry, RiskScore).
+type SuspiciousLoginResult struct {
+	// Suspicious is true if the IP is not in the user's known login history.
+	Suspicious bool
+
+	// ForceMFA is true when Suspicious is true AND the configured action is
+	// SuspiciousLoginChallengeMFA. The auth usecase should route to the MFA
+	// challenge flow when this is set, regardless of whether MFA is enrolled.
+	ForceMFA bool
+}
+
+// SuspiciousLoginConfig holds the knobs for the detection policy.
+type SuspiciousLoginConfig struct {
+	// Enabled controls whether suspicious login detection runs at all.
+	Enabled bool
+
+	// KnownIPWindow is how far back to look for prior successful logins from
+	// this IP. A value of 90 days means "this IP is known if used in the last 3 months."
+	KnownIPWindow time.Duration
+
+	// Action determines what happens when a new IP is detected.
+	Action SuspiciousLoginAction
 }

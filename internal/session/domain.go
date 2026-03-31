@@ -49,7 +49,8 @@ type UserProvider interface {
 	FindByID(ctx context.Context, id string) (*user.User, error)
 }
 
-// Default token lifetimes. These will become per-tenant configurable in Phase 3C.
+// Default token lifetimes.
+// TODO: These will become per-tenant configurable in the future.
 const (
 	DefaultAccessTokenTTL  = 15 * time.Minute
 	DefaultRefreshTokenTTL = 30 * 24 * time.Hour // 30 days
