@@ -10,6 +10,7 @@ import (
 	"github.com/dwikynator/core-auth/internal/config"
 	"github.com/dwikynator/core-auth/internal/infra/audit"
 	"github.com/dwikynator/core-auth/internal/infra/database"
+	appmetrics "github.com/dwikynator/core-auth/internal/infra/metrics"
 	internalredis "github.com/dwikynator/core-auth/internal/infra/redis"
 
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
@@ -162,6 +163,7 @@ func run() error {
 		minato.WithAddr(httpAddr),
 		minato.WithGRPCAddr(grpcAddr),
 		minato.WithGRPCReflection(),
+		minato.WithMetrics(),
 		minato.WithGatewayMuxOptions(merr.WithGatewayErrorHandler()),
 
 		// Built-in /healthz and /readyz
@@ -190,6 +192,9 @@ func run() error {
 		middleware.RequestIDPlugin(),
 		middleware.LoggerPlugin(),
 	)
+
+	// Metrics middleware — must be first so all HTTP requests are counted
+	server.Use(appmetrics.Middleware)
 
 	// HTTP-only middleware (browser / REST concerns)
 	server.Use(middleware.CORS())

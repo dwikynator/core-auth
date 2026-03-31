@@ -7,6 +7,7 @@ import (
 
 	"github.com/dwikynator/core-auth/internal/auth"
 	"github.com/dwikynator/core-auth/internal/infra/audit"
+	appmetrics "github.com/dwikynator/core-auth/internal/infra/metrics"
 	"github.com/dwikynator/core-auth/internal/mfa"
 	userdomain "github.com/dwikynator/core-auth/internal/user"
 
@@ -155,20 +156,25 @@ func (uc *authUsecase) Login(ctx context.Context, req *auth.LoginRequest) (*auth
 		return nil, err
 	}
 
+	appmetrics.LoginAttemptsTotal.WithLabelValues(req.ClientId).Inc()
+
 	if err := uc.rateLimiter.CheckAccountLockout(ctx, user.ID); err != nil {
 		if errors.Is(err, errs.ErrAccountLocked) {
 			uc.auditLogger.Log(ctx, audit.NewEvent(ctx, audit.EventAccountLocked, user.ID))
 		}
+		appmetrics.LoginFailuresTotal.WithLabelValues("account_locked").Inc()
 		return nil, err // Returns ErrAccountLocked
 	}
 
 	// 3. Reject accounts that cannot log in.
 	switch user.Status {
 	case "suspended":
+		appmetrics.LoginFailuresTotal.WithLabelValues("account_suspended").Inc()
 		return nil, errs.ErrAccountSuspended
 	case "deleted":
 		return nil, errs.ErrAccountDeleted
 	case "unverified":
+		appmetrics.LoginFailuresTotal.WithLabelValues("account_not_verified").Inc()
 		return nil, errs.ErrAccountNotVerified
 	}
 
@@ -186,6 +192,7 @@ func (uc *authUsecase) Login(ctx context.Context, req *auth.LoginRequest) (*auth
 
 		uc.auditLogger.Log(ctx, audit.NewEvent(ctx, audit.EventLoginFailed, user.ID))
 
+		appmetrics.LoginFailuresTotal.WithLabelValues("invalid_credentials").Inc()
 		return nil, errs.ErrInvalidCredentials
 	}
 
@@ -196,6 +203,7 @@ func (uc *authUsecase) Login(ctx context.Context, req *auth.LoginRequest) (*auth
 		evt := audit.NewEvent(ctx, audit.EventIPBlocked, user.ID)
 		evt.Metadata = map[string]string{"ip": ip, "client_id": req.ClientId}
 		uc.auditLogger.Log(ctx, evt)
+		appmetrics.LoginFailuresTotal.WithLabelValues("ip_not_allowed").Inc()
 		return nil, errs.ErrIPNotAllowed
 	}
 
@@ -243,6 +251,7 @@ func (uc *authUsecase) Login(ctx context.Context, req *auth.LoginRequest) (*auth
 	if err != nil {
 		return nil, err
 	}
+	appmetrics.RecordTokenIssued("password")
 
 	uc.auditLogger.Log(ctx, audit.NewEvent(ctx, audit.EventLogin, user.ID))
 

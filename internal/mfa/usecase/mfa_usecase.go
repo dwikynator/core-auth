@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 
+	appmetrics "github.com/dwikynator/core-auth/internal/infra/metrics"
+
 	"github.com/dwikynator/core-auth/internal/infra/audit"
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
 	errs "github.com/dwikynator/core-auth/internal/libs/errors"
@@ -303,6 +305,7 @@ func (uc *mfaUseCase) ChallengeMFA(ctx context.Context, req *mfa.ChallengeMFAReq
 	if err != nil {
 		return nil, err
 	}
+	appmetrics.RecordTokenIssued("mfa")
 
 	// 5. Build response.
 	user, err := uc.userProvider.FindByID(ctx, sessionData.UserID)

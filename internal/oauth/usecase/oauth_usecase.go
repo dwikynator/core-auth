@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/dwikynator/core-auth/internal/infra/audit"
+	appmetrics "github.com/dwikynator/core-auth/internal/infra/metrics"
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
 	errs "github.com/dwikynator/core-auth/internal/libs/errors"
 	"github.com/dwikynator/core-auth/internal/mfa"
@@ -171,6 +172,7 @@ func (uc *oauthUseCase) OAuthCallback(ctx context.Context, req *oauth.OAuthCallb
 	if err != nil {
 		return nil, err
 	}
+	appmetrics.RecordTokenIssued("oauth")
 
 	return &oauth.OAuthCallbackResponse{
 		OAuthSuccess: &oauth.OAuthSuccess{
@@ -238,6 +240,7 @@ func (uc *oauthUseCase) LinkProvider(ctx context.Context, req *oauth.LinkProvide
 	if err != nil {
 		return nil, err
 	}
+	appmetrics.RecordTokenIssued("oauth")
 
 	uc.auditLogger.Log(ctx, audit.NewEvent(ctx, audit.EventOAuthLink, user.ID))
 

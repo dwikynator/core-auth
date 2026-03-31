@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dwikynator/core-auth/internal/infra/audit"
+	appmetrics "github.com/dwikynator/core-auth/internal/infra/metrics"
 	contextLib "github.com/dwikynator/core-auth/internal/libs/context"
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
 	errs "github.com/dwikynator/core-auth/internal/libs/errors"
@@ -231,6 +232,7 @@ func (uc *sessionUseCase) RefreshToken(ctx context.Context, req *domain.RefreshT
 	if err := uc.sessionRepo.RotateRefreshToken(ctx, session.ID, result.RefreshTokenHash); err != nil {
 		return nil, errs.WithMessage(errs.ErrInternal, "failed to rotate refresh token")
 	}
+	appmetrics.RecordTokenIssued("refresh")
 
 	return result.TokenPair, nil
 }
