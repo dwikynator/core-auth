@@ -5,6 +5,7 @@ package auth.v1;
 option go_package = "github.com/dwikynator/core-auth/gen/auth/v1;authv1";
 
 import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
 
 // ---------------------------------------------------------------------------
 // Shared Messages
@@ -40,3 +41,37 @@ message Session {
   google.protobuf.Timestamp created_at  = 5;
   google.protobuf.Timestamp last_used_at = 6;
 }
+
+// ---------------------------------------------------------------------------
+// Global Swagger / OpenAPI metadata
+// Applies to the merged contract/openapi.swagger.json output.
+// ---------------------------------------------------------------------------
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title:       "core-auth API";
+    version:     "1.0.0";
+    description: "Authentication and identity service. Provides registration, login, MFA, session management, OAuth2, and admin controls.";
+    contact: {
+      name:  "core-auth";
+      url:   "https://github.com/dwikynator/core-auth";
+    };
+  };
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+
+  // JWT Bearer token security definition.
+  // Endpoints that require authentication inherit this via security_definitions.
+  security_definitions: {
+    security: {
+      key:   "BearerAuth";
+      value: {
+        type:        TYPE_API_KEY;
+        in:          IN_HEADER;
+        name:        "Authorization";
+        description: "JWT Bearer token. Format: `Bearer <access_token>`";
+      };
+    };
+  };
+};

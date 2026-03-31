@@ -40,6 +40,8 @@ proto:
 		--openapiv2_opt=merge_file_name=openapi \
 		$(PROTO_FILES)
 		
+	@echo "==> Copying spec to embed dir..."
+	@cp $(CONTRACT_OUT)/openapi.swagger.json internal/auth/delivery/embed/openapi.swagger.json
 	@echo "==> Proto generation complete."
 
 # Application

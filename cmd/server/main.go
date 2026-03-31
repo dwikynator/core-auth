@@ -207,6 +207,7 @@ func run() error {
 	))
 
 	authdelivery.RegisterAuthGRPCHandler(server, authUc, mfaUc, tenantUc)
+	authdelivery.RegisterDocsHTTPHandler(server)
 	userdelivery.RegisterUserGRPCHandler(server, userUc, mfaUc)
 	admindelivery.RegisterAdminGRPCHandler(server, adminUc)
 	sessiondelivery.RegisterSessionGRPCHandler(server, sessionUc)

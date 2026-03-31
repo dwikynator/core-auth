@@ -7,6 +7,7 @@
 package authv1
 
 import (
+	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -281,7 +282,7 @@ var File_auth_v1_shared_proto protoreflect.FileDescriptor
 
 const file_auth_v1_shared_proto_rawDesc = "" +
 	"\n" +
-	"\x14auth/v1/shared.proto\x12\aauth.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"r\n" +
+	"\x14auth/v1/shared.proto\x12\aauth.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"r\n" +
 	"\tTokenPair\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
@@ -309,7 +310,12 @@ const file_auth_v1_shared_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\flast_used_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"lastUsedAtB4Z2github.com/dwikynator/core-auth/gen/auth/v1;authv1b\x06proto3"
+	"lastUsedAtB\x80\x03\x92A\xc8\x02\x12\xc5\x01\n" +
+	"\rcore-auth API\x12wAuthentication and identity service. Provides registration, login, MFA, session management, OAuth2, and admin controls.\"4\n" +
+	"\tcore-auth\x12'https://github.com/dwikynator/core-auth2\x051.0.0*\x02\x02\x012\x10application/json:\x10application/jsonZV\n" +
+	"T\n" +
+	"\n" +
+	"BearerAuth\x12F\b\x02\x121JWT Bearer token. Format: `Bearer <access_token>`\x1a\rAuthorization \x02Z2github.com/dwikynator/core-auth/gen/auth/v1;authv1b\x06proto3"
 
 var (
 	file_auth_v1_shared_proto_rawDescOnce sync.Once
