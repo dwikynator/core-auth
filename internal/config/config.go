@@ -46,6 +46,10 @@ type Config struct {
 	SuspiciousLoginEnabled bool          `env:"SUSPICIOUS_LOGIN_ENABLED"    envDefault:"true"`
 	SuspiciousLoginWindow  time.Duration `env:"SUSPICIOUS_LOGIN_WINDOW"     envDefault:"2160h"`      // 90 days
 	SuspiciousLoginAction  string        `env:"SUSPICIOUS_LOGIN_ACTION"     envDefault:"audit_only"` // "audit_only" | "challenge_mfa"
+
+	// Observability — OpenTelemetry
+	// Leave empty to disable tracing (no-op TracerProvider is used instead).
+	OTELEndpoint string `env:"OTEL_EXPORTER_OTLP_ENDPOINT" envDefault:""`
 }
 
 // Load reads .env (if present) and parses environment variables into Config.

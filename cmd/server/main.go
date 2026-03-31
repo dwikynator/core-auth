@@ -12,9 +12,13 @@ import (
 	"github.com/dwikynator/core-auth/internal/infra/database"
 	appmetrics "github.com/dwikynator/core-auth/internal/infra/metrics"
 	internalredis "github.com/dwikynator/core-auth/internal/infra/redis"
+	apptracing "github.com/dwikynator/core-auth/internal/infra/tracing"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/dwikynator/core-auth/internal/libs/crypto"
 	"github.com/dwikynator/core-auth/internal/libs/email"
+	"google.golang.org/grpc"
 
 	"github.com/dwikynator/core-auth/internal/oauth"
 
@@ -70,6 +74,17 @@ func run() error {
 	}
 
 	slog.Info("configuration loaded", "grpc_port", cfg.GRPCPort, "http_port", cfg.HTTPPort)
+
+	// Initialise OpenTelemetry tracing.
+	// If OTEL_EXPORTER_OTLP_ENDPOINT is empty, a no-op provider is used.
+	shutdownTracing, err := apptracing.Setup(ctx, "core-auth", cfg.OTELEndpoint)
+	if err != nil {
+		return fmt.Errorf("init tracing: %w", err)
+	}
+
+	// shutdownTracing is deferred via minato.WithCloser below so it runs
+	// during graceful shutdown, after in-flight requests complete.
+	slog.Info("tracing initialised", "endpoint", cfg.OTELEndpoint)
 
 	db, err := database.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -165,6 +180,9 @@ func run() error {
 		minato.WithGRPCReflection(),
 		minato.WithMetrics(),
 		minato.WithGatewayMuxOptions(merr.WithGatewayErrorHandler()),
+		minato.WithGRPCServerOption(
+			grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		),
 
 		// Built-in /healthz and /readyz
 		minato.WithHealthCheck(),
@@ -183,6 +201,10 @@ func run() error {
 			db.Close()
 			return nil
 		}),
+		minato.WithCloser("otel-tracing", func() error {
+			shutdownTracing()
+			return nil
+		}),
 	)
 
 	tokenValidator := sessionmiddleware.NewTokenValidator(tokenIssuer.PublicKey(), cfg.JWTIssuer, blacklistRepo)
@@ -195,6 +217,11 @@ func run() error {
 
 	// Metrics middleware — must be first so all HTTP requests are counted
 	server.Use(appmetrics.Middleware)
+
+	// HTTP OTel middleware — wraps every inbound HTTP request in a span.
+	// Must be placed AFTER appmetrics.Middleware and BEFORE CORS so that
+	// the trace context is available to all downstream middleware and handlers.
+	server.Use(otelhttp.NewMiddleware("core-auth"))
 
 	// HTTP-only middleware (browser / REST concerns)
 	server.Use(middleware.CORS())
