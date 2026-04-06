@@ -56,7 +56,7 @@ func (h *authGRPCHandler) Register(ctx context.Context, req *authv1.RegisterRequ
 
 	profile := userdelivery.MapUserToProto(user)
 	profile.Scopes = h.tenantUc.ResolveScopes(ctx, req.GetClientId())
-	profile.MfaEnabled = h.mfaUc.IsEnrolled(ctx, user.ID)
+	profile.MfaEnabled = false // newly registered users cannot have MFA configured yet
 
 	return &authv1.RegisterResponse{
 		User: profile,
