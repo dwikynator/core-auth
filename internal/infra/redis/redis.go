@@ -8,10 +8,11 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-func NewClient(ctx context.Context, redisURL string) (*redis.Client, error) {
-	opts, err := redis.ParseURL(redisURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse redis url: %w", err)
+func NewClient(ctx context.Context, host, port, password string) (*redis.Client, error) {
+	opts := &redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", host, port),
+		Password: password, // no password set if empty
+		DB:       0,        // use default DB
 	}
 
 	client := redis.NewClient(opts)

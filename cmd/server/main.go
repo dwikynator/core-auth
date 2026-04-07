@@ -86,13 +86,13 @@ func run() error {
 	// during graceful shutdown, after in-flight requests complete.
 	slog.Info("tracing initialised", "endpoint", cfg.OTELEndpoint)
 
-	db, err := database.NewPool(ctx, cfg.DatabaseURL)
+	db, err := database.NewPool(ctx, cfg.DatabaseDSN())
 	if err != nil {
 		return fmt.Errorf("connect postgres: %w", err)
 	}
 	slog.Info("postgres connected")
 
-	rdb, err := internalredis.NewClient(ctx, cfg.RedisURL)
+	rdb, err := internalredis.NewClient(ctx, cfg.RedisHost, cfg.RedisPort, cfg.RedisPassword)
 	if err != nil {
 		return fmt.Errorf("connect redis: %w", err)
 	}

@@ -66,5 +66,3 @@ require (
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260330182312-d5a96adf58d8 // indirect
 )
-
-replace github.com/dwikynator/minato => /Users/dwikynator/course/rg/minato

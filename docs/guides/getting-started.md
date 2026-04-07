@@ -210,7 +210,9 @@ All configuration is read from environment variables (or a `.env` file at the re
 
 | Variable | Default | Required | Description |
 |---|---|---|---|
-| `REDIS_URL` | — | **Yes** | Redis connection string. Example: `redis://localhost:6380/0` |
+| `REDIS_HOST` | — | **Yes** | Redis host. Example: `localhost` |
+| `REDIS_PORT` | `6379` | **Yes** | Redis port. Example: `6380` |
+| `REDIS_PASSWORD` | — | No | Redis password. Optional in development. |
 
 ### JWT & Token Signing
 

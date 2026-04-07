@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -9,10 +10,16 @@ import (
 
 // Config holds all environemnt-based configuration for the device.
 type Config struct {
-	GRPCPort    int    `env:"GRPC_PORT" envDefault:"50051"`
-	HTTPPort    int    `env:"HTTP_PORT" envDefault:"8080"`
-	DatabaseURL string `env:"DATABASE_URL,required"`
-	RedisURL    string `env:"REDIS_URL,required"`
+	GRPCPort      int    `env:"GRPC_PORT" envDefault:"50051"`
+	HTTPPort      int    `env:"HTTP_PORT" envDefault:"8080"`
+	DBHost        string `env:"CORE_AUTH_API_HOST,required"`
+	DBPort        string `env:"CORE_AUTH_API_PORT,required"`
+	DBUser        string `env:"CORE_AUTH_API_USERNAME,required"`
+	DBPass        string `env:"CORE_AUTH_API_PASSWORD,required"`
+	DBName        string `env:"CORE_AUTH_API_DBNAME,required"`
+	RedisHost     string `env:"REDIS_HOST,required"`
+	RedisPort     string `env:"REDIS_PORT,required"`
+	RedisPassword string `env:"REDIS_PASSWORD"`
 
 	// JWT
 	RSAPrivateKeyPath string `env:"RSA_PRIVATE_KEY_PATH,required"`
@@ -62,4 +69,10 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+// DatabaseDSN constructs the connection string in Key-Value format to safely support special characters.
+func (c *Config) DatabaseDSN() string {
+	return fmt.Sprintf("host=%s port=%s user=%s password='%s' dbname=%s sslmode=disable",
+		c.DBHost, c.DBPort, c.DBUser, c.DBPass, c.DBName)
 }
