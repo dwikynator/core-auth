@@ -91,3 +91,13 @@ docker-up:
 
 docker-down:
 	docker compose down
+
+IMAGE_TAG ?= asia-southeast1-docker.pkg.dev/lycanidas-zero/services/core-auth:latest
+
+docker-build:
+	@echo "==> Building Docker image for linux/amd64..."
+	docker build --platform linux/amd64 -t $(IMAGE_TAG) .
+
+docker-push:
+	@echo "==> Pushing docker image..."
+	docker push $(IMAGE_TAG)
