@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: core-auth-db-migration
+  namespace: production
+  labels:
+    app: core-auth
+    component: database-migration
+spec:
+  # Limit retries to prevent endless loops against the DB if something is fundamentally wrong
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app: core-auth
+        component: database-migration
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrator
+          # Replace <your-registry> and <version> appropriately when deploying
+          image: asia-southeast1-docker.pkg.dev/lycanidas-zero/services/core-auth-migrations:latest
+          imagePullPolicy: Always
+          # Mount the core-auth-db-credentials secret as environment variables
+          envFrom:
+            - secretRef:
+                name: core-auth-db-credentials
